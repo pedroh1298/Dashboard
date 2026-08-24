@@ -1,0 +1,77 @@
+/**
+ * Configuração das categorias e termos de busca do vendedor.
+ * Adicione ou remova categorias e palavras-chave conforme necessário.
+ */
+export const SELLER_CATEGORIES = [
+  {
+    name: 'Cinto Couro Legítimo',
+    keywords: [
+      'cinto feminino couro legítimo',
+      'cinto couro feminino',
+      'cinto fino couro legítimo',
+      'cinto largo couro feminino',
+      'cinto social feminino',
+      'cinto casual feminino',
+      'cinto premium feminino',
+      'cinto couro fivela dourada',
+      'cinto couro fivela prata',
+      'cinto meia lua',
+      'cinto statement',
+    ],
+  },
+  {
+    name: 'Cinto Metal',
+    keywords: [
+      'cinto feminino metal',
+      'cinto corrente feminino',
+      'cinto metálico feminino',
+      'cinto corrente dourado',
+      'cinto corrente prata',
+      'cinto de elos',
+      'cinto joia',
+      'cinto com pingentes',
+      'cinto com strass',
+      'cinto chain belt',
+      'cinto dourado feminino',
+      'cinto metal moda',
+    ],
+  },
+  {
+    name: 'Bolsa Couro Legítimo',
+    keywords: [
+      'bolsa feminina couro legítimo',
+      'bolsa couro feminina',
+      'bolsa couro premium',
+      'bolsa transversal couro',
+      'bolsa tiracolo couro',
+      'bolsa de ombro couro',
+      'bolsa tote couro',
+      'bolsa hobo couro',
+      'bolsa baguete couro',
+      'bolsa estruturada couro',
+      'bolsa slouchy couro',
+      'bolsa top handle couro',
+    ],
+  },
+  {
+    name: 'Bolsa Festa',
+    keywords: [
+      'bolsa festa feminina',
+      'bolsa social feminina',
+      'bolsa noite',
+      'bolsa clutch',
+      'clutch festa',
+      'bolsa strass',
+      'bolsa pedraria',
+      'bolsa brilho',
+      'bolsa metalizada',
+      'bolsa dourada festa',
+      'bolsa prata festa',
+      'bolsa corrente',
+      'bolsa casamento',
+      'bolsa formatura',
+      'bolsa madrinha',
+      'bolsa balada',
+    ],
+  },
+];

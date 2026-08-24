@@ -1,0 +1,3 @@
+import { ProductAnalysisRequest, ProductAnalysisResponse, MarketReportRequest, MarketReportResponse, ListingGenerationRequest, SalesAnalysisRequest, SalesAnalysisResponse, ChatRequest, ChatResponse } from '../types';
+
+export interface AIProvider { analyzeProductImage(request: ProductAnalysisRequest): Promise<ProductAnalysisResponse>; generateMarketReport(request: MarketReportRequest): Promise<MarketReportResponse>; generateListingTitle(request: ListingGenerationRequest): Promise<string>; generateListingDescription(request: ListingGenerationRequest): Promise<string>; analyzeSalesMetrics(request: SalesAnalysisRequest): Promise<SalesAnalysisResponse>; chat(request: ChatRequest): Promise<ChatResponse>; }

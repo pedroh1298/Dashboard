@@ -1,0 +1,1 @@
+export class AIError extends Error { public provider: string; public statusCode?: number; constructor(message: string, provider: string, statusCode?: number) { super(message); this.name = 'AIError'; this.provider = provider; this.statusCode = statusCode; if (Error.captureStackTrace) { Error.captureStackTrace(this, AIError); } } }
