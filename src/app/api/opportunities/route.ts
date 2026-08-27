@@ -11,21 +11,32 @@ interface ScrapedProduct {
 }
 
 /**
- * Raspa os resultados de busca do Mercado Livre para um termo específico.
+ * Raspa os resultados de busca do Mercado Livre para um termo específico com timeout e tolerância a falhas.
  */
 async function scrapeMLSearch(keyword: string): Promise<{ totalResults: string; products: ScrapedProduct[] }> {
   const encoded = encodeURIComponent(keyword);
   const url = `https://lista.mercadolivre.com.br/${encoded.replace(/%20/g, '-')}`;
 
+  // Adiciona um AbortController com timeout de 3.5 segundos.
+  // Isso impede que a requisição trave a rota da Vercel (limite de 10s no plano Free)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+
   try {
     const res = await fetch(url, {
+      signal: controller.signal,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept-Language': 'pt-BR,pt;q=0.9',
       },
     });
 
-    if (!res.ok) return { totalResults: '0', products: [] };
+    clearTimeout(timeoutId);
+
+    if (!res.ok) {
+      console.warn(`[Scraper] ML retornou status ${res.status}`);
+      return { totalResults: 'N/A', products: [] };
+    }
 
     const html = await res.text();
     const $ = cheerio.load(html);
@@ -52,9 +63,11 @@ async function scrapeMLSearch(keyword: string): Promise<{ totalResults: string; 
     });
 
     return { totalResults, products };
-  } catch (error) {
-    console.error(`Erro ao raspar ML para "${keyword}":`, error);
-    return { totalResults: '0', products: [] };
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    console.error(`[Scraper] Erro ao raspar ML para "${keyword}":`, error.name === 'AbortError' ? 'Timeout' : error.message);
+    // Retorna vazio em caso de timeout ou bloqueio de IP (comum em servidores de nuvem como Vercel/AWS)
+    return { totalResults: 'N/A', products: [] };
   }
 }
 
@@ -67,21 +80,30 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 1. Raspa os 10 primeiros anúncios do ML para o termo pesquisado
+    // 1. Executa a raspagem com limite de tempo
     const { totalResults, products } = await scrapeMLSearch(query);
 
-    // 2. Monta resumo para a IA
-    const productList = products.map((p, i) => 
-      `${i + 1}. "${p.title}" — ${p.price} | ${p.freeShipping ? 'Frete Grátis' : 'Frete Pago'} | Vendedor: ${p.seller}`
-    ).join('\n');
+    let dataSummary = '';
 
-    const dataSummary = `Termo pesquisado: "${query}"
+    // 2. Trata o fluxo caso o Mercado Livre bloqueie o IP da Vercel (AWS) ou dê Timeout
+    if (products.length === 0) {
+      console.log(`[Radar] ML bloqueou ou falhou para "${query}". Executando análise com IA pura.`);
+      dataSummary = `Termo pesquisado: "${query}"
+Atenção: A raspagem direta do Mercado Livre foi bloqueada (comum em servidores de nuvem/Vercel). 
+Por favor, analise este produto no mercado brasileiro de e-commerce usando seu conhecimento nativo, assumindo que é um produto altamente pesquisado no Mercado Livre.`;
+    } else {
+      const productList = products.map((p, i) => 
+        `${i + 1}. "${p.title}" — ${p.price} | ${p.freeShipping ? 'Frete Grátis' : 'Frete Pago'} | Vendedor: ${p.seller}`
+      ).join('\n');
+
+      dataSummary = `Termo pesquisado: "${query}"
 Total de resultados no Mercado Livre: ${totalResults}
 
-Top 10 anúncios encontrados:
+Top 10 anúncios encontrados para contextualizar preços:
 ${productList}`;
+    }
 
-    // 3. Envia para o Gemini analisar
+    // 3. Envia para o Gemini analisar (com ou sem os dados raspados)
     const ai = AIService.getProvider();
     const report = await ai.generateMarketReport({
       category: query,
