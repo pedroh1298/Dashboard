@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
-  BarChart3, Package, ShoppingCart, Settings, Bell, 
-  Activity, LogOut, Sparkles, TrendingUp, AlertTriangle, Lightbulb,
-  ExternalLink, Truck, Search
+  Bell, 
+  Activity, TrendingUp, AlertTriangle, Lightbulb,
+  ExternalLink, Truck, Search, Clock, X, History
 } from 'lucide-react';
-import Link from 'next/link';
+import Sidebar from '@/components/Sidebar';
 
 interface ScrapedProduct {
   title: string;
@@ -29,27 +29,56 @@ interface ResultData {
   report: Report;
 }
 
+const HISTORY_KEY = 'vortex_oportunidades_history';
+const MAX_HISTORY = 8;
+
+function loadHistory(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function saveToHistory(term: string) {
+  if (typeof window === 'undefined') return;
+  const history = loadHistory().filter(h => h !== term);
+  history.unshift(term);
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+}
+
 export default function Oportunidades() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ResultData | null>(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'report' | 'data'>('report');
+  const [history, setHistory] = useState<string[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchTerm.trim()) return;
+  useEffect(() => {
+    setHistory(loadHistory());
+  }, []);
 
+  const handleSearch = async (term: string) => {
+    const q = term.trim();
+    if (!q) return;
+
+    setSearchTerm(q);
+    setShowHistory(false);
     setLoading(true);
     setError('');
     setResult(null);
 
     try {
-      const res = await fetch(`/api/opportunities?q=${encodeURIComponent(searchTerm)}`);
+      const res = await fetch(`/api/opportunities?q=${encodeURIComponent(q)}`);
       const data = await res.json();
       if (data.success) {
         setResult(data);
         setActiveTab('report');
+        saveToHistory(q);
+        setHistory(loadHistory());
       } else {
         setError(data.error || 'Erro ao analisar oportunidades');
       }
@@ -60,46 +89,34 @@ export default function Oportunidades() {
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSearch(searchTerm);
+  };
+
+  const removeFromHistory = (term: string) => {
+    const updated = history.filter(h => h !== term);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+    setHistory(updated);
+  };
+
+  const clearHistory = () => {
+    localStorage.removeItem(HISTORY_KEY);
+    setHistory([]);
+    setShowHistory(false);
+  };
+
   return (
     <div className="flex h-screen bg-[#0a0a0c] text-white font-sans overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#121215] border-r border-white/10 flex-col hidden md:flex">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <Sparkles className="w-4 h-4 text-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">Vortex<span className="text-indigo-400">AI</span></span>
-        </div>
-        
-        <nav className="flex-1 px-4 py-4 space-y-1">
-          <Link href="/" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-            <BarChart3 className="w-5 h-5" /> Dashboard
-          </Link>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-            <Package className="w-5 h-5" /> Produtos
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-            <ShoppingCart className="w-5 h-5" /> Pedidos
-          </a>
-          <Link href="/oportunidades" className="flex items-center gap-3 px-3 py-2 rounded-lg bg-indigo-500/10 text-indigo-400 font-medium">
-            <Activity className="w-5 h-5" /> Oportunidades
-          </Link>
-        </nav>
-
-        <div className="p-4 mt-auto">
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-colors">
-            <Settings className="w-5 h-5" /> Configurações
-          </a>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-400/10 transition-colors mt-1">
-            <LogOut className="w-5 h-5" /> Sair
-          </a>
-        </div>
-      </aside>
+      <Sidebar />
 
       <main className="flex-1 flex flex-col overflow-y-auto">
         {/* Topbar */}
         <header className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-[#121215]/80 backdrop-blur-md sticky top-0 z-10">
-          <div><h2 className="font-bold text-lg">Inteligência de Mercado</h2></div>
+          <div className="flex items-center gap-3">
+            <Activity className="w-5 h-5 text-indigo-400" />
+            <h2 className="font-bold text-lg">Inteligência de Mercado</h2>
+          </div>
           <div className="flex items-center gap-4">
             <button className="p-2 relative rounded-full hover:bg-white/5 transition-colors">
               <Bell className="w-5 h-5 text-gray-400" />
@@ -121,26 +138,93 @@ export default function Oportunidades() {
               Digite o nome de um produto e a IA vai analisar preços, concorrência e oportunidades em tempo real no Mercado Livre.
             </p>
 
-            <form onSubmit={handleSearch} className="relative">
-              <div className="flex items-center bg-[#121215] border-2 border-white/10 rounded-2xl px-5 py-4 focus-within:border-indigo-500 transition-colors shadow-xl">
-                <Search className="w-5 h-5 text-gray-500 shrink-0" />
-                <input 
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Ex: bolsa feminina couro legítimo, cinto corrente dourado..."
-                  className="bg-transparent border-none outline-none ml-3 text-white placeholder-gray-600 w-full text-lg"
-                  disabled={loading}
-                />
-                <button 
-                  type="submit" 
-                  disabled={loading || !searchTerm.trim()}
-                  className="ml-3 px-6 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all text-sm shrink-0"
-                >
-                  {loading ? 'Analisando...' : 'Pesquisar'}
-                </button>
+            {/* Campo de busca com histórico */}
+            <div className="relative">
+              <form onSubmit={handleSubmit}>
+                <div className="flex items-center bg-[#121215] border-2 border-white/10 rounded-2xl px-5 py-4 focus-within:border-indigo-500 transition-colors shadow-xl">
+                  <Search className="w-5 h-5 text-gray-500 shrink-0" />
+                  <input 
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onFocus={() => history.length > 0 && setShowHistory(true)}
+                    onBlur={() => setTimeout(() => setShowHistory(false), 150)}
+                    placeholder="Ex: bolsa feminina couro legítimo, cinto corrente dourado..."
+                    className="bg-transparent border-none outline-none ml-3 text-white placeholder-gray-600 w-full text-lg"
+                    disabled={loading}
+                  />
+                  {history.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowHistory(v => !v)}
+                      className="p-2 rounded-lg text-gray-500 hover:text-indigo-400 hover:bg-white/5 transition-colors shrink-0 mr-1"
+                      title="Histórico de buscas"
+                    >
+                      <History className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button 
+                    type="submit" 
+                    disabled={loading || !searchTerm.trim()}
+                    className="ml-1 px-6 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all text-sm shrink-0"
+                  >
+                    {loading ? 'Analisando...' : 'Pesquisar'}
+                  </button>
+                </div>
+              </form>
+
+              {/* Dropdown do histórico */}
+              {showHistory && history.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a20] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
+                    <span className="text-xs text-gray-500 font-medium flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5" /> Buscas recentes
+                    </span>
+                    <button
+                      onClick={clearHistory}
+                      className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                    >
+                      Limpar tudo
+                    </button>
+                  </div>
+                  {history.map((term, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between px-4 py-2.5 hover:bg-white/5 transition-colors group"
+                    >
+                      <button
+                        className="flex items-center gap-3 text-left flex-1 text-sm text-gray-300 hover:text-white transition-colors"
+                        onClick={() => handleSearch(term)}
+                      >
+                        <Search className="w-3.5 h-3.5 text-gray-600 shrink-0" />
+                        {term}
+                      </button>
+                      <button
+                        onClick={() => removeFromHistory(term)}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10 text-gray-600 hover:text-red-400 transition-all"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Chips de sugestão rápida */}
+            {!result && !loading && (
+              <div className="flex flex-wrap gap-2 justify-center mt-4">
+                {['bolsa clutch festa', 'cinto couro fivela', 'fone bluetooth', 'mochila masculina'].map(s => (
+                  <button
+                    key={s}
+                    onClick={() => handleSearch(s)}
+                    className="px-3 py-1.5 bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-300 text-xs rounded-full transition-all"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
-            </form>
+            )}
           </div>
 
           {/* Loading */}
