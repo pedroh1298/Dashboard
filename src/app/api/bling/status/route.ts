@@ -1,58 +1,104 @@
 import { NextResponse } from 'next/server';
+import { isSessionAuthenticated, unauthorizedJson } from '@/lib/auth';
+import { BlingClient } from '@/services/bling/blingClient';
+import { BlingService } from '@/services/bling/blingService';
+import { areBlingCredentialsConfigured, getBlingRedirectUri, parseScopeList } from '@/services/bling/config';
+import { REQUIRED_SCOPES } from '@/services/bling/constants';
+import { BlingApiError } from '@/services/bling/errors';
+import { extractAuthorizationCode } from '@/services/bling/oauth';
+import { createRequestTokenStore } from '@/services/bling/session';
 import { BlingTokenManager } from '@/services/bling/tokenManager';
 
-export async function GET() {
-  const connected = BlingTokenManager.isConnected();
-  const tokens = BlingTokenManager.getStoredTokens();
+function publicStatus(record: Awaited<ReturnType<BlingTokenManager['getRecord']>>) {
+  if (!record) {
+    return {
+      connected: false,
+      status: 'disconnected' as const,
+      expiresAt: null as string | null,
+      scopes: [] as string[],
+    };
+  }
 
-  return NextResponse.json({
-    connected,
-    expiresAt: tokens?.expires_at || null,
-    scope: tokens?.scope || null,
-  });
+  const expired = Date.now() >= record.expires_at;
+  return {
+    connected: true,
+    status: expired ? 'expired' as const : record.status,
+    expiresAt: new Date(record.expires_at).toISOString(),
+    scopes: parseScopeList(record.scope),
+  };
+}
+
+export async function GET() {
+  if (!(await isSessionAuthenticated())) {
+    return unauthorizedJson();
+  }
+
+  const store = await createRequestTokenStore();
+  const manager = new BlingTokenManager(store);
+  const record = await manager.getRecord();
+  const base = {
+    ...publicStatus(record),
+    credentialsConfigured: areBlingCredentialsConfigured(),
+    redirectUri: getBlingRedirectUri(),
+    requiredScopes: REQUIRED_SCOPES,
+  };
+
+  if (!record?.access_token) {
+    return NextResponse.json(base);
+  }
+
+  try {
+    const client = new BlingClient(store);
+    const service = new BlingService(client);
+    const probe = await service.probeConnection();
+    return NextResponse.json({
+      ...base,
+      ...publicStatus(await manager.getRecord()),
+      probe,
+    });
+  } catch (error: unknown) {
+    const message = error instanceof BlingApiError ? error.userMessage : 'Não foi possível consultar o Bling.';
+    return NextResponse.json({
+      ...base,
+      probe: { ok: false, resource: 'produtos', error: message },
+    });
+  }
 }
 
 export async function DELETE() {
-  BlingTokenManager.clearTokens();
+  if (!(await isSessionAuthenticated())) {
+    return unauthorizedJson();
+  }
+
+  const store = await createRequestTokenStore();
+  const manager = new BlingTokenManager(store);
+  await manager.disconnect();
   return NextResponse.json({ success: true, message: 'Bling desconectado com sucesso.' });
 }
 
 export async function POST(request: Request) {
+  if (!(await isSessionAuthenticated())) {
+    return unauthorizedJson();
+  }
+
   try {
     const body = await request.json();
-    
-    if (body.code) {
-      let code = String(body.code).trim();
-      // Se o usuário colou a URL inteira retornada pelo Bling
-      if (code.includes('code=')) {
-        const match = code.match(/[?&]code=([^&#]+)/);
-        if (match && match[1]) {
-          code = decodeURIComponent(match[1]);
-        }
-      }
-      
-      const tokens = await BlingTokenManager.exchangeCodeForTokens(code);
-      return NextResponse.json({ success: true, tokens });
+    if (!body.code) {
+      return NextResponse.json({
+        success: false,
+        error: 'Informe o código de autorização retornado pelo Bling.',
+      }, { status: 400 });
     }
 
-    if (body.access_token) {
-      const saved = BlingTokenManager.saveTokens({
-        access_token: body.access_token.trim(),
-        refresh_token: (body.refresh_token || '').trim(),
-        expires_in: body.expires_in || 21600,
-        token_type: body.token_type || 'Bearer',
-        scope: body.scope || 'all',
-      });
-      return NextResponse.json({ success: true, tokens: saved });
-    }
-
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Parâmetros inválidos. Forneça o código de autorização (code) ou o access_token.' 
-    }, { status: 400 });
+    const store = await createRequestTokenStore();
+    const manager = new BlingTokenManager(store);
+    await manager.exchangeCodeForTokens(extractAuthorizationCode(String(body.code)));
+    return NextResponse.json({ success: true });
   } catch (error: unknown) {
-    const err = error as Error;
-    console.error('[API Bling Status POST] Erro:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    const message = error instanceof BlingApiError
+      ? error.userMessage
+      : 'Não foi possível conectar ao Bling.';
+    console.error('[API Bling Status POST] Falha na autorização');
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

@@ -1,32 +1,74 @@
 import { NextResponse } from 'next/server';
+import { BlingApiError } from '@/services/bling/errors';
+import { describeOAuthCallbackError, extractAuthorizationCode } from '@/services/bling/oauth';
+import {
+  clearOAuthStateCookie,
+  createResponseTokenStore,
+  getRequestOAuthState,
+} from '@/services/bling/session';
+import { timingSafeEqual } from '@/services/bling/crypto';
 import { BlingTokenManager } from '@/services/bling/tokenManager';
+
+function redirectHome(requestUrl: string, params: Record<string, string>) {
+  const url = new URL(requestUrl);
+  const target = new URL('/', `${url.protocol}//${url.host}`);
+  Object.entries(params).forEach(([key, value]) => target.searchParams.set(key, value));
+  return NextResponse.redirect(target);
+}
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const code = url.searchParams.get('code');
+  const codeParam = url.searchParams.get('code');
+  const stateParam = url.searchParams.get('state');
   const error = url.searchParams.get('error');
   const errorDescription = url.searchParams.get('error_description');
 
-  const baseUrl = `${url.protocol}//${url.host}`;
-
   if (error) {
-    console.error('[API Bling Callback] Erro retornado pelo Bling:', error, errorDescription);
-    return NextResponse.redirect(new URL(`/?bling_error=${encodeURIComponent(errorDescription || error)}`, baseUrl));
+    const mapped = describeOAuthCallbackError(error, errorDescription);
+    const response = redirectHome(request.url, {
+      bling_error: mapped.code,
+      bling_message: mapped.message,
+    });
+    clearOAuthStateCookie(response);
+    return response;
   }
 
-  if (!code) {
-    return NextResponse.redirect(new URL('/?bling_error=Código de autorização não fornecido pelo Bling', baseUrl));
+  const expectedState = await getRequestOAuthState();
+  if (!expectedState || !stateParam || !timingSafeEqual(expectedState, stateParam)) {
+    const response = redirectHome(request.url, {
+      bling_error: 'invalid_state',
+      bling_message: 'Não foi possível conectar ao Bling. A validação de segurança falhou. Tente autorizar novamente.',
+    });
+    clearOAuthStateCookie(response);
+    return response;
   }
+
+  if (!codeParam) {
+    const response = redirectHome(request.url, {
+      bling_error: 'missing_code',
+      bling_message: 'Não foi possível conectar ao Bling. O código de autorização não foi retornado.',
+    });
+    clearOAuthStateCookie(response);
+    return response;
+  }
+
+  const response = redirectHome(request.url, { bling_connected: 'true' });
+  clearOAuthStateCookie(response);
 
   try {
-    console.log('[API Bling Callback] Código recebido. Trocando por tokens...');
-    await BlingTokenManager.exchangeCodeForTokens(code);
-    console.log('[API Bling Callback] Tokens obtidos e armazenados com sucesso!');
-
-    return NextResponse.redirect(new URL('/?bling_connected=true', baseUrl));
+    const code = extractAuthorizationCode(codeParam);
+    const store = createResponseTokenStore(response);
+    const manager = new BlingTokenManager(store);
+    await manager.exchangeCodeForTokens(code);
+    return response;
   } catch (error: unknown) {
-    const err = error as Error;
-    console.error('[API Bling Callback] Erro ao trocar código:', err);
-    return NextResponse.redirect(new URL(`/?bling_error=${encodeURIComponent(err.message || 'Erro ao validar credenciais')}`, baseUrl));
+    const userMessage = error instanceof BlingApiError
+      ? error.userMessage
+      : 'Não foi possível conectar ao Bling.';
+    console.error('[API Bling Callback] Falha na troca de token:', error instanceof BlingApiError ? error.status : 'unknown');
+    return redirectHome(request.url, {
+      bling_error: 'token',
+      bling_message: userMessage,
+    });
   }
 }

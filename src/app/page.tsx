@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import { 
   BarChart3, 
   ShoppingCart, 
@@ -61,6 +62,10 @@ interface RecentOrder {
   situacao?: { id: number; valor?: string };
 }
 
+interface Insight {
+  content: string;
+}
+
 export default function Dashboard() {
   const [salesData, setSalesData] = useState<SalesData[]>([]);
   const [metrics, setMetrics] = useState<Metrics>({
@@ -74,7 +79,7 @@ export default function Dashboard() {
     ticketTrend: 0
   });
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
-  const [insights, setInsights] = useState<any[]>([]);
+  const [insights, setInsights] = useState<Insight[]>([]);
   const [loading, setLoading] = useState(true);
   const [isBlingConnected, setIsBlingConnected] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -165,8 +170,9 @@ export default function Dashboard() {
       } else {
         alert(data.error || 'Erro ao validar o código do Bling.');
       }
-    } catch (err: any) {
-      alert(`Falha na requisição: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Erro desconhecido';
+      alert(`Falha na requisição: ${message}`);
     } finally {
       setModalSubmitting(false);
     }
@@ -447,12 +453,12 @@ export default function Dashboard() {
                   <ShoppingCart className="w-5 h-5 text-indigo-400" />
                   <h2 className="text-lg font-semibold">Pedidos Recentes</h2>
                 </div>
-                <a
+                <Link
                   href="/pedidos"
                   className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
                 >
                   Ver todos <ExternalLink className="w-3.5 h-3.5" />
-                </a>
+                </Link>
               </div>
               <div className="divide-y divide-white/5">
                 {recentOrders.slice(0, 5).map((order) => {
@@ -482,13 +488,13 @@ export default function Dashboard() {
                 })}
               </div>
               <div className="px-6 py-3 border-t border-white/10 flex justify-center">
-                <a
+                <Link
                   href="/pedidos"
                   className="text-xs text-gray-500 hover:text-indigo-400 transition-colors flex items-center gap-1.5"
                 >
                   <Calendar className="w-3.5 h-3.5" />
                   Ver histórico completo de pedidos
-                </a>
+                </Link>
               </div>
             </div>
           )}

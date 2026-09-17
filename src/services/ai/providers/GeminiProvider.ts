@@ -19,9 +19,13 @@ export class GeminiProvider implements AIProvider {
     this.ai = new GoogleGenerativeAI(apiKey);
   }
 
-  private handleError(error: any, operation: string): never {
+  private handleError(error: unknown, operation: string): never {
     console.error(`[GeminiProvider] Error during ${operation}:`, error);
-    throw new AIError(error?.message || 'Erro interno de comunicação com o modelo Gemini', 'Gemini', error?.status || 500);
+    const err = error instanceof Error ? error : new Error('Erro interno de comunicação com o modelo Gemini');
+    const status = typeof (error as { status?: unknown })?.status === 'number'
+      ? (error as { status: number }).status
+      : 500;
+    throw new AIError(err.message, 'Gemini', status);
   }
 
   async analyzeProductImage(request: ProductAnalysisRequest): Promise<ProductAnalysisResponse> {

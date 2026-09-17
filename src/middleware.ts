@@ -1,16 +1,28 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { hasAuthCookie } from '@/lib/auth';
 
 export function middleware(request: NextRequest) {
-  const isAuth = request.cookies.get('is_authenticated')?.value;
-  const isLoginPage = request.nextUrl.pathname === '/login';
+  const isAuth = hasAuthCookie(request.headers.get('cookie'));
+  const { pathname } = request.nextUrl;
+  const isLoginPage = pathname === '/login';
+  const isBlingCallback = pathname === '/api/bling/callback';
 
-  // Se não estiver logado e não for a página de login, redireciona para o login
+  if (isBlingCallback) {
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith('/api/')) {
+    if (!isAuth) {
+      return NextResponse.json({ success: false, error: 'Não autenticado.' }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
   if (!isAuth && !isLoginPage) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // Se estiver logado e tentar acessar a página de login, redireciona para o dashboard
   if (isAuth && isLoginPage) {
     return NextResponse.redirect(new URL('/', request.url));
   }
@@ -18,7 +30,6 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Configura o middleware para rodar em todas as rotas, exceto arquivos estáticos
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };

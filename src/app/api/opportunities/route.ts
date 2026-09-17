@@ -63,9 +63,10 @@ async function scrapeMLSearch(keyword: string): Promise<{ totalResults: string; 
     });
 
     return { totalResults, products };
-  } catch (error: any) {
+  } catch (error: unknown) {
     clearTimeout(timeoutId);
-    console.error(`[Scraper] Erro ao raspar ML para "${keyword}":`, error.name === 'AbortError' ? 'Timeout' : error.message);
+    const err = error instanceof Error ? error : new Error('Erro desconhecido');
+    console.error(`[Scraper] Erro ao raspar ML para "${keyword}":`, err.name === 'AbortError' ? 'Timeout' : err.message);
     // Retorna vazio em caso de timeout ou bloqueio de IP (comum em servidores de nuvem como Vercel/AWS)
     return { totalResults: 'N/A', products: [] };
   }

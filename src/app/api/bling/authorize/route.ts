@@ -1,23 +1,29 @@
 import { NextResponse } from 'next/server';
-import { BlingTokenManager } from '@/services/bling/tokenManager';
+import { isSessionAuthenticated, unauthorizedJson } from '@/lib/auth';
+import { areBlingCredentialsConfigured, buildAuthorizationUrl } from '@/services/bling/config';
+import { applyOAuthStateCookie, createOAuthState } from '@/services/bling/session';
 
-export async function GET(request: Request) {
+export async function GET() {
+  if (!(await isSessionAuthenticated())) {
+    return unauthorizedJson();
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const state = searchParams.get('state') || 'vortex_bling_auth';
-    const authUrl = BlingTokenManager.getAuthorizationUrl(state);
-
-    // Se a requisição veio do navegador (navegação direta), redireciona
-    const acceptHeader = request.headers.get('accept') || '';
-    if (acceptHeader.includes('text/html')) {
-      return NextResponse.redirect(authUrl);
+    if (!areBlingCredentialsConfigured()) {
+      return NextResponse.json(
+        { success: false, error: 'Credenciais do Bling não configuradas no servidor.' },
+        { status: 500 }
+      );
     }
 
-    // Se foi chamada via fetch, retorna a URL em JSON
-    return NextResponse.json({ success: true, url: authUrl });
+    const state = createOAuthState();
+    const authUrl = buildAuthorizationUrl(state);
+    const response = NextResponse.redirect(authUrl);
+    applyOAuthStateCookie(response, state);
+    return response;
   } catch (error: unknown) {
     const err = error as Error;
-    console.error('[API Bling Authorize] Erro:', err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    console.error('[API Bling Authorize] Erro:', err.message);
+    return NextResponse.json({ success: false, error: 'Não foi possível iniciar a autorização do Bling.' }, { status: 500 });
   }
 }

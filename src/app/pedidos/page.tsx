@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import Link from 'next/link';
 import {
   ShoppingCart,
   Bell,
@@ -192,9 +193,9 @@ export default function PedidosPage() {
                 <h3 className="font-bold text-lg text-amber-300">Bling ERP não conectado</h3>
                 <p className="text-gray-400 text-sm mt-1">Conecte sua conta do Bling no Dashboard para visualizar os pedidos.</p>
               </div>
-              <a href="/" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all">
+              <Link href="/" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all">
                 Ir para o Dashboard
-              </a>
+              </Link>
             </div>
           )}
 

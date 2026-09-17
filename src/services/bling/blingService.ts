@@ -1,59 +1,21 @@
-import { BlingTokenManager } from './tokenManager';
-import { 
-  BlingOrder, 
-  BlingOrdersResponse, 
-  BlingProduct, 
-  BlingProductsResponse, 
-  DashboardData, 
-  DashboardMetrics, 
-  DashboardSalesPoint 
+import { BlingClient } from './blingClient';
+import { BlingApiError } from './errors';
+import {
+  BlingOrder,
+  BlingOrdersResponse,
+  BlingProduct,
+  BlingProductsResponse,
+  DashboardData,
+  DashboardMetrics,
+  DashboardSalesPoint,
 } from './types';
 
+const MAX_PAGES = 5;
+
 export class BlingService {
-  private static readonly BASE_URL = 'https://api.bling.com.br/Api/v3';
+  constructor(private readonly client: BlingClient) {}
 
-  /**
-   * Executa uma requisição autenticada à API v3 do Bling com renovação automática em caso de 401
-   */
-  private static async fetchWithAuth<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    let token = await BlingTokenManager.getValidAccessToken();
-
-    const doRequest = async (accessToken: string) => {
-      const url = `${this.BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
-      return fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json',
-          'enable-jwt': '1',
-        },
-      });
-    };
-
-    let response = await doRequest(token);
-
-    // Se o token expirou no meio do caminho (401), força a renovação e tenta novamente uma vez
-    if (response.status === 401) {
-      console.warn('[BlingService] Recebido 401. Tentando renovar access token...');
-      const newTokens = await BlingTokenManager.refreshAccessToken();
-      token = newTokens.access_token;
-      response = await doRequest(token);
-    }
-
-    if (!response.ok) {
-      const errorMsg = await response.text();
-      console.error(`[BlingService] Erro na requisição para ${endpoint}: ${response.status} - ${errorMsg}`);
-      throw new Error(`Erro na API Bling (${response.status}): ${errorMsg}`);
-    }
-
-    return response.json() as Promise<T>;
-  }
-
-  /**
-   * Busca pedidos de venda do Bling com filtros
-   */
-  public static async getOrders(params?: {
+  async getOrders(params?: {
     dataInicial?: string;
     dataFinal?: string;
     pagina?: number;
@@ -67,82 +29,86 @@ export class BlingService {
     query.append('limite', (params?.limite || 100).toString());
     if (params?.idSituacao) query.append('idSituacao', params.idSituacao.toString());
 
-    const endpoint = `/pedidos/vendas?${query.toString()}`;
-    const result = await this.fetchWithAuth<BlingOrdersResponse>(endpoint);
+    const result = await this.client.get<BlingOrdersResponse>(`/pedidos/vendas?${query.toString()}`);
     return result.data || [];
   }
 
-  /**
-   * Busca produtos cadastrados no Bling
-   */
-  public static async getProducts(params?: {
+  async getAllOrders(params?: {
+    dataInicial?: string;
+    dataFinal?: string;
+    limite?: number;
+    idSituacao?: number;
+  }): Promise<BlingOrder[]> {
+    const orders: BlingOrder[] = [];
+    for (let pagina = 1; pagina <= MAX_PAGES; pagina += 1) {
+      const page = await this.getOrders({ ...params, pagina });
+      orders.push(...page);
+      if (page.length < (params?.limite || 100)) break;
+    }
+    return orders;
+  }
+
+  async getProducts(params?: {
     pagina?: number;
     limite?: number;
   }): Promise<BlingProduct[]> {
     const query = new URLSearchParams();
     if (params?.pagina) query.append('pagina', params.pagina.toString());
     query.append('limite', (params?.limite || 100).toString());
-
-    const endpoint = `/produtos?${query.toString()}`;
-    const result = await this.fetchWithAuth<BlingProductsResponse>(endpoint);
+    const result = await this.client.get<BlingProductsResponse>(`/produtos?${query.toString()}`);
     return result.data || [];
   }
 
-  /**
-   * Calcula as métricas completas para exibição no Dashboard com base nos pedidos reais
-   */
-  public static async getDashboardData(): Promise<DashboardData> {
-    if (!BlingTokenManager.isConnected()) {
+  async probeConnection(): Promise<{ ok: boolean; resource: string; error?: string }> {
+    try {
+      await this.client.get<BlingProductsResponse>('/produtos?limite=1');
+      return { ok: true, resource: 'produtos' };
+    } catch (error) {
+      const err = error instanceof BlingApiError ? error : null;
+      return {
+        ok: false,
+        resource: 'produtos',
+        error: err?.userMessage || 'Não foi possível consultar o Bling.',
+      };
+    }
+  }
+
+  async getDashboardData(): Promise<DashboardData> {
+    const connected = await this.client.tokenManager.isConnected();
+    if (!connected) {
       return {
         connected: false,
-        metrics: {
-          faturamento: 0,
-          lucro: 0,
-          pedidos: 0,
-          ticketMedio: 0,
-          faturamentoTrend: 0,
-          lucroTrend: 0,
-          pedidosTrend: 0,
-          ticketTrend: 0,
-        },
+        metrics: emptyMetrics(),
         salesData: [],
         message: 'Bling ERP não conectado. Clique em "Conectar Bling" para integrar suas vendas.',
       };
     }
 
     try {
-      // Datas para os últimos 30 dias e os 30 dias anteriores (para calcular tendências)
       const now = new Date();
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(now.getDate() - 30);
-
       const sixtyDaysAgo = new Date();
       sixtyDaysAgo.setDate(now.getDate() - 60);
-
       const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
-      // Busca pedidos do período atual
-      const currentOrders = await this.getOrders({
+      const currentOrders = await this.getAllOrders({
         dataInicial: formatDate(thirtyDaysAgo),
         dataFinal: formatDate(now),
         limite: 100,
       });
 
-      // Busca pedidos do período anterior para tendências
-      const previousOrders = await this.getOrders({
+      const previousOrders = await this.getAllOrders({
         dataInicial: formatDate(sixtyDaysAgo),
         dataFinal: formatDate(thirtyDaysAgo),
         limite: 100,
       }).catch(() => [] as BlingOrder[]);
 
-      // Cálculos período atual
       const faturamentoAtual = currentOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
       const pedidosAtual = currentOrders.length;
       const ticketMedioAtual = pedidosAtual > 0 ? faturamentoAtual / pedidosAtual : 0;
-      // Estimativa conservadora de margem de lucro líquido de 22% caso não haja custo cadastrado
       const lucroAtual = faturamentoAtual * 0.22;
 
-      // Cálculos período anterior
       const faturamentoAnterior = previousOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
       const pedidosAnterior = previousOrders.length;
       const ticketMedioAnterior = pedidosAnterior > 0 ? faturamentoAnterior / pedidosAnterior : 0;
@@ -164,7 +130,6 @@ export class BlingService {
         ticketTrend: calcTrend(ticketMedioAtual, ticketMedioAnterior),
       };
 
-      // Agregação diária para o gráfico dos últimos 14 dias
       const salesMap = new Map<string, { ML: number; Amazon: number; Outros: number }>();
       const last14Days: string[] = [];
 
@@ -181,15 +146,12 @@ export class BlingService {
         if (salesMap.has(orderDate)) {
           const entry = salesMap.get(orderDate)!;
           const val = Number(order.total) || 0;
-          
-          // Classificação de canal (se tiver identificação de canal no Bling, como loja ou número)
           const numLoja = (order.numeroLoja || '').toLowerCase();
           if (numLoja.includes('ml') || numLoja.includes('mercado') || (order.loja?.id && order.loja.id % 2 === 0)) {
             entry.ML += val;
           } else if (numLoja.includes('amz') || numLoja.includes('amazon')) {
             entry.Amazon += val;
           } else {
-            // Se canal genérico, distribui proporcionalmente para visualização
             entry.ML += val * 0.65;
             entry.Amazon += val * 0.35;
           }
@@ -213,25 +175,39 @@ export class BlingService {
         salesData,
         recentOrders: currentOrders.slice(0, 5),
       };
-
     } catch (error: unknown) {
-      const err = error as Error;
-      console.error('[BlingService] Falha ao compilar dados do dashboard:', err);
+      if (error instanceof BlingApiError && error.status === 403) {
+        return {
+          connected: true,
+          metrics: emptyMetrics(),
+          salesData: [],
+          message: error.userMessage,
+        };
+      }
+
+      const message = error instanceof BlingApiError
+        ? error.userMessage
+        : 'Erro ao sincronizar dados com o Bling.';
+      console.error('[BlingService] Falha ao compilar dados do dashboard:', error instanceof Error ? error.message : 'unknown');
       return {
         connected: false,
-        metrics: {
-          faturamento: 0,
-          lucro: 0,
-          pedidos: 0,
-          ticketMedio: 0,
-          faturamentoTrend: 0,
-          lucroTrend: 0,
-          pedidosTrend: 0,
-          ticketTrend: 0,
-        },
+        metrics: emptyMetrics(),
         salesData: [],
-        message: `Erro ao sincronizar dados com o Bling: ${err.message}`,
+        message,
       };
     }
   }
+}
+
+function emptyMetrics(): DashboardMetrics {
+  return {
+    faturamento: 0,
+    lucro: 0,
+    pedidos: 0,
+    ticketMedio: 0,
+    faturamentoTrend: 0,
+    lucroTrend: 0,
+    pedidosTrend: 0,
+    ticketTrend: 0,
+  };
 }

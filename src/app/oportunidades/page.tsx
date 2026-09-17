@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Bell, 
   Activity, TrendingUp, AlertTriangle, Lightbulb,
@@ -54,12 +54,8 @@ export default function Oportunidades() {
   const [result, setResult] = useState<ResultData | null>(null);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'report' | 'data'>('report');
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<string[]>(() => loadHistory());
   const [showHistory, setShowHistory] = useState(false);
-
-  useEffect(() => {
-    setHistory(loadHistory());
-  }, []);
 
   const handleSearch = async (term: string) => {
     const q = term.trim();
@@ -232,7 +228,7 @@ export default function Oportunidades() {
             <div className="flex flex-col items-center justify-center py-20 space-y-6">
               <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
               <div className="text-center">
-                <p className="text-indigo-400 animate-pulse font-medium text-lg">Analisando "{searchTerm}"...</p>
+                <p className="text-indigo-400 animate-pulse font-medium text-lg">Analisando &quot;{searchTerm}&quot;...</p>
                 <p className="text-gray-500 text-sm mt-2">Raspando preços do Mercado Livre e consultando a IA. Aguarde até 30s.</p>
               </div>
             </div>
@@ -256,7 +252,7 @@ export default function Oportunidades() {
               <div className="bg-[#121215] border border-white/10 rounded-2xl p-5 flex items-center justify-between">
                 <div>
                   <span className="text-sm text-gray-400">Resultados para</span>
-                  <h2 className="text-xl font-bold text-white">"{result.query}"</h2>
+                  <h2 className="text-xl font-bold text-white">&quot;{result.query}&quot;</h2>
                 </div>
                 <span className="text-sm text-gray-500 bg-white/5 px-4 py-2 rounded-lg">{result.totalResults}</span>
               </div>
@@ -359,7 +355,7 @@ export default function Oportunidades() {
             <div className="text-center py-16 text-gray-600">
               <Search className="w-12 h-12 mx-auto mb-4 opacity-30" />
               <p className="text-lg">Digite um produto acima para começar a análise.</p>
-              <p className="text-sm mt-2">Exemplos: "bolsa clutch festa", "cinto couro fivela dourada", "fone bluetooth"</p>
+              <p className="text-sm mt-2">Exemplos: &quot;bolsa clutch festa&quot;, &quot;cinto couro fivela dourada&quot;, &quot;fone bluetooth&quot;</p>
             </div>
           )}
         </div>

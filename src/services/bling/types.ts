@@ -7,6 +7,13 @@ export interface BlingTokenData {
   expires_at: number; // Timestamp em milissegundos
 }
 
+export interface BlingIntegrationRecord extends BlingTokenData {
+  ownerId: string;
+  connected_at: number;
+  updated_at: number;
+  status: 'active' | 'disconnected' | 'expired';
+}
+
 export interface BlingOrderContact {
   id?: number;
   nome?: string;
