@@ -43,12 +43,11 @@ export function getBasicAuthHeader(): string {
   return `Basic ${Buffer.from(credentials).toString('base64')}`;
 }
 
-export function buildAuthorizationUrl(state: string, clientId = getBlingClientId(), redirectUri = getBlingRedirectUri()): string {
+export function buildAuthorizationUrl(state: string, clientId = getBlingClientId()): string {
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
     state,
-    redirect_uri: redirectUri,
   });
   return `${BLING_AUTHORIZE_URL}?${params.toString()}`;
 }
