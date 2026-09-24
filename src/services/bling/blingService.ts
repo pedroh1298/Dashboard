@@ -10,7 +10,8 @@ import {
   DashboardSalesPoint,
 } from './types';
 
-const MAX_PAGES = 5;
+const MAX_ORDER_PAGES = 5;
+const MAX_PRODUCT_PAGES = 100;
 
 export class BlingService {
   constructor(private readonly client: BlingClient) {}
@@ -40,7 +41,7 @@ export class BlingService {
     idSituacao?: number;
   }): Promise<BlingOrder[]> {
     const orders: BlingOrder[] = [];
-    for (let pagina = 1; pagina <= MAX_PAGES; pagina += 1) {
+    for (let pagina = 1; pagina <= MAX_ORDER_PAGES; pagina += 1) {
       const page = await this.getOrders({ ...params, pagina });
       orders.push(...page);
       if (page.length < (params?.limite || 100)) break;
@@ -57,6 +58,21 @@ export class BlingService {
     query.append('limite', (params?.limite || 100).toString());
     const result = await this.client.get<BlingProductsResponse>(`/produtos?${query.toString()}`);
     return result.data || [];
+  }
+
+  async getAllProducts(params?: {
+    limite?: number;
+  }): Promise<BlingProduct[]> {
+    const limit = params?.limite || 100;
+    const products: BlingProduct[] = [];
+
+    for (let pagina = 1; pagina <= MAX_PRODUCT_PAGES; pagina += 1) {
+      const page = await this.getProducts({ pagina, limite: limit });
+      products.push(...page);
+      if (page.length < limit) break;
+    }
+
+    return products;
   }
 
   async probeConnection(): Promise<{ ok: boolean; resource: string; error?: string }> {

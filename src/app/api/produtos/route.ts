@@ -11,12 +11,21 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const pagina = searchParams.get('pagina') ? Number(searchParams.get('pagina')) : undefined;
+  const pageParam = searchParams.get('pagina');
+  const pagina = pageParam ? Number(pageParam) : undefined;
 
   try {
     const store = await createRequestTokenStore();
-    const products = await new BlingService(new BlingClient(store)).getProducts({ pagina, limite: 100 });
-    return NextResponse.json({ success: true, products });
+    const service = new BlingService(new BlingClient(store));
+    const products = pagina
+      ? await service.getProducts({ pagina, limite: 100 })
+      : await service.getAllProducts({ limite: 100 });
+
+    return NextResponse.json({
+      success: true,
+      products,
+      total: products.length,
+    });
   } catch (error: unknown) {
     const message = error instanceof BlingApiError ? error.userMessage : 'Erro ao buscar produtos';
     console.error('[API Produtos] Erro');
