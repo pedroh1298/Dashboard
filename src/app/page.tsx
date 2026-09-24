@@ -112,7 +112,12 @@ export default function Dashboard() {
           setInsights([]);
         }
 
-        if (data.connected && data.message) {
+        if (data.connected && data.tokenStorage === 'browser') {
+          setToastMessage({
+            type: 'error',
+            text: 'A conexão com o Bling ainda está salva somente neste dispositivo. Verifique as variáveis do Supabase na Vercel.',
+          });
+        } else if (data.connected && data.message) {
           setToastMessage({
             type: 'error',
             text: data.message,

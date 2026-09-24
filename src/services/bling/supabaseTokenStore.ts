@@ -26,10 +26,26 @@ interface BlingIntegrationRow {
   status: 'active' | 'disconnected' | 'expired';
 }
 
-function getConfig(): SupabaseConfig | null {
-  const url = process.env.SUPABASE_URL?.trim();
-  const key = process.env.SUPABASE_SECRET_KEY?.trim()
+function getSecretKey(): string | undefined {
+  const directKey = process.env.SUPABASE_SECRET_KEY?.trim()
     || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (directKey) return directKey;
+
+  const keySet = process.env.SUPABASE_SECRET_KEYS?.trim();
+  if (!keySet) return undefined;
+
+  try {
+    const parsed = JSON.parse(keySet) as Record<string, string>;
+    return parsed.default || Object.values(parsed).find(Boolean);
+  } catch {
+    return undefined;
+  }
+}
+
+function getConfig(): SupabaseConfig | null {
+  const url = process.env.SUPABASE_URL?.trim()
+    || process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = getSecretKey();
 
   if (!url || !key) return null;
 
@@ -42,6 +58,10 @@ function getConfig(): SupabaseConfig | null {
 
 export function isSupabaseTokenStoreConfigured(): boolean {
   return getConfig() !== null;
+}
+
+export function getBlingTokenStorageMode(): 'supabase' | 'browser' {
+  return isSupabaseTokenStoreConfigured() ? 'supabase' : 'browser';
 }
 
 export class SupabaseTokenStore implements TokenStore {

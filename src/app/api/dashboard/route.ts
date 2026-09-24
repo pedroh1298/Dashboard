@@ -4,6 +4,7 @@ import { BlingClient } from '@/services/bling/blingClient';
 import { BlingService } from '@/services/bling/blingService';
 import { BlingApiError } from '@/services/bling/errors';
 import { createRequestTokenStore } from '@/services/bling/session';
+import { getBlingTokenStorageMode } from '@/services/bling/supabaseTokenStore';
 
 export async function GET() {
   if (!(await isSessionAuthenticated())) {
@@ -15,6 +16,7 @@ export async function GET() {
     const dashboardData = await new BlingService(new BlingClient(store)).getDashboardData();
     return NextResponse.json({
       success: true,
+      tokenStorage: getBlingTokenStorageMode(),
       ...dashboardData,
     });
   } catch (error: unknown) {
