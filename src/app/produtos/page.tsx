@@ -40,9 +40,9 @@ function formatCurrency(val: number) {
 }
 
 const SITUACAO_STYLES: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  'A': { label: 'Ativo',    color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  'I': { label: 'Inativo',  color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/30',        icon: <XCircle className="w-3.5 h-3.5" /> },
-  'E': { label: 'Excluído', color: 'text-gray-500',    bg: 'bg-gray-500/10 border-gray-500/30',      icon: <XCircle className="w-3.5 h-3.5" /> },
+  'A': { label: 'Ativo',    color: 'text-[#176b57]', bg: 'bg-[#e5f1ec] border-[#b9d5ca]', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  'I': { label: 'Inativo',  color: 'text-[#9b3b2d]', bg: 'bg-[#f7e7e3] border-[#dfb8af]', icon: <XCircle className="w-3.5 h-3.5" /> },
+  'E': { label: 'Excluído', color: 'text-[#666a63]', bg: 'bg-[#ecece5] border-[#d5d6ce]', icon: <XCircle className="w-3.5 h-3.5" /> },
 };
 
 const STOCK_FILTERS = [
@@ -134,51 +134,57 @@ export default function ProdutosPage() {
     : 0;
 
   return (
-    <div className="flex h-screen bg-[#0a0a0c] text-white font-sans overflow-hidden">
+    <div className="app-shell">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col overflow-y-auto relative">
+      <main className="app-main">
         {/* Topbar */}
-        <header className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-[#121215]/80 backdrop-blur-md sticky top-0 z-10">
+        <header className="app-topbar">
           <div className="flex items-center gap-3">
-            <Package className="w-5 h-5 text-indigo-400" />
-            <h1 className="font-bold text-lg">Catálogo de Produtos</h1>
+            <Package className="h-[18px] w-[18px] text-[#176b57]" />
+            <h1 className="text-sm font-semibold">Catálogo de produtos</h1>
           </div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => { setLoading(true); fetchProducts(); }}
               disabled={syncing}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50"
+              className="button-secondary px-3 text-xs disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               Atualizar
             </button>
-            <button className="p-2 rounded-full hover:bg-white/5 transition-colors">
-              <Bell className="w-5 h-5 text-gray-400" />
+            <button className="icon-button" aria-label="Notificações">
+              <Bell className="h-[18px] w-[18px]" />
             </button>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 border-2 border-[#0a0a0c] flex items-center justify-center text-xs font-bold">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#26322c] text-[11px] font-semibold text-white">
               AD
             </div>
           </div>
         </header>
 
-        <div className="p-6 md:p-8 max-w-7xl mx-auto w-full space-y-6">
+        <div className="app-content space-y-6">
+
+          <div>
+            <p className="page-kicker mb-3">Inventário</p>
+            <h2 className="page-title">Produtos</h2>
+            <p className="page-description mt-2">Consulte preços, disponibilidade e situação do catálogo sincronizado com o Bling.</p>
+          </div>
 
           {loading && (
             <div className="flex flex-col items-center justify-center py-32 gap-4">
-              <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
-              <p className="text-gray-400 text-sm animate-pulse">Sincronizando produtos do Bling ERP...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-[#176b57]" />
+              <p className="text-sm text-[#6f736d]">Sincronizando produtos do Bling ERP...</p>
             </div>
           )}
 
           {!loading && !connectedBling && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-8 flex flex-col items-center text-center gap-4">
-              <AlertCircle className="w-10 h-10 text-amber-400" />
+            <div className="surface flex flex-col items-center gap-4 p-8 text-center">
+              <AlertCircle className="h-9 w-9 text-[#a25714]" />
               <div>
-                <h3 className="font-bold text-lg text-amber-300">Bling ERP não conectado</h3>
-                <p className="text-gray-400 text-sm mt-1">Conecte sua conta do Bling no Dashboard para visualizar o catálogo.</p>
+                <h3 className="text-lg font-semibold text-[#20221f]">Bling ERP não conectado</h3>
+                <p className="mt-1 text-sm text-[#6f736d]">Conecte sua conta do Bling no painel para visualizar o catálogo.</p>
               </div>
-              <Link href="/" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all">
+              <Link href="/" className="button-primary px-5 text-sm">
                 Ir para o Dashboard
               </Link>
             </div>
@@ -187,63 +193,59 @@ export default function ProdutosPage() {
           {!loading && connectedBling && (
             <>
               {/* Cards de resumo */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4 relative overflow-hidden group hover:border-indigo-500/30 transition-colors">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-indigo-500/5 rounded-full blur-2xl -mr-4 -mt-4 group-hover:bg-indigo-500/10 transition-colors" />
+              <div className="metric-strip grid-cols-2 lg:grid-cols-4">
+                <div className="metric-cell">
                   <div className="flex items-center gap-2 mb-2">
-                    <BarChart2 className="w-4 h-4 text-indigo-400" />
-                    <p className="text-xs text-gray-400">Total de Produtos</p>
+                    <BarChart2 className="h-4 w-4 text-[#176b57]" />
+                    <p className="text-xs text-[#737770]">Total de produtos</p>
                   </div>
-                  <p className="text-2xl font-bold">{products.length}</p>
-                  <p className="text-xs text-gray-500 mt-1">{ativos} ativos</p>
+                  <p className="data-number text-2xl font-semibold">{products.length}</p>
+                  <p className="mt-1 text-xs text-[#858981]">{ativos} ativos</p>
                 </div>
 
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4 relative overflow-hidden group hover:border-emerald-500/30 transition-colors">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full blur-2xl -mr-4 -mt-4 group-hover:bg-emerald-500/10 transition-colors" />
+                <div className="metric-cell">
                   <div className="flex items-center gap-2 mb-2">
-                    <Boxes className="w-4 h-4 text-emerald-400" />
-                    <p className="text-xs text-gray-400">Estoque Total</p>
+                    <Boxes className="h-4 w-4 text-[#176b57]" />
+                    <p className="text-xs text-[#737770]">Estoque total</p>
                   </div>
-                  <p className="text-2xl font-bold text-emerald-400">{estoqueTotal.toFixed(0)}</p>
-                  <p className="text-xs text-gray-500 mt-1">unidades</p>
+                  <p className="data-number text-2xl font-semibold text-[#176b57]">{estoqueTotal.toFixed(0)}</p>
+                  <p className="mt-1 text-xs text-[#858981]">unidades</p>
                 </div>
 
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4 relative overflow-hidden group hover:border-red-500/30 transition-colors">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-red-500/5 rounded-full blur-2xl -mr-4 -mt-4 group-hover:bg-red-500/10 transition-colors" />
+                <div className="metric-cell">
                   <div className="flex items-center gap-2 mb-2">
-                    <TrendingDown className="w-4 h-4 text-red-400" />
-                    <p className="text-xs text-gray-400">Sem Estoque</p>
+                    <TrendingDown className="h-4 w-4 text-[#a44435]" />
+                    <p className="text-xs text-[#737770]">Sem estoque</p>
                   </div>
-                  <p className="text-2xl font-bold text-red-400">{semEstoque}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="data-number text-2xl font-semibold text-[#a44435]">{semEstoque}</p>
+                  <p className="mt-1 text-xs text-[#858981]">
                     {products.length > 0 ? `${((semEstoque / products.length) * 100).toFixed(0)}% do catálogo` : '-'}
                   </p>
                 </div>
 
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4 relative overflow-hidden group hover:border-orange-500/30 transition-colors">
-                  <div className="absolute top-0 right-0 w-16 h-16 bg-orange-500/5 rounded-full blur-2xl -mr-4 -mt-4 group-hover:bg-orange-500/10 transition-colors" />
+                <div className="metric-cell">
                   <div className="flex items-center gap-2 mb-2">
-                    <Tag className="w-4 h-4 text-orange-400" />
-                    <p className="text-xs text-gray-400">Preço Médio</p>
+                    <Tag className="h-4 w-4 text-[#a25714]" />
+                    <p className="text-xs text-[#737770]">Preço médio</p>
                   </div>
-                  <p className="text-xl font-bold text-orange-400">{formatCurrency(valorMedio)}</p>
-                  <p className="text-xs text-gray-500 mt-1">por produto</p>
+                  <p className="data-number text-xl font-semibold text-[#8a4c15]">{formatCurrency(valorMedio)}</p>
+                  <p className="mt-1 text-xs text-[#858981]">por produto</p>
                 </div>
               </div>
 
               {/* Filtros */}
               <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
                 {/* Estoque */}
-                <div className="flex items-center gap-2 bg-[#121215] border border-white/10 rounded-xl p-1">
+                <div className="surface flex items-center gap-1 p-1">
                   <Boxes className="w-4 h-4 text-gray-500 ml-2" />
                   {STOCK_FILTERS.map(f => (
                     <button
                       key={f.value}
                       onClick={() => setStockFilter(f.value)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
                         stockFilter === f.value
-                          ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                          : 'text-gray-400 hover:text-white'
+                          ? 'bg-[#26322c] text-white'
+                          : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
                       }`}
                     >
                       {f.label}
@@ -252,12 +254,12 @@ export default function ProdutosPage() {
                 </div>
 
                 {/* Situação */}
-                <div className="flex items-center gap-2 bg-[#121215] border border-white/10 rounded-xl p-1">
+                <div className="surface flex items-center gap-1 p-1">
                   <Filter className="w-4 h-4 text-gray-500 ml-2" />
                   <button
                     onClick={() => setSituacaoFilter(null)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      situacaoFilter === null ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'
+                    className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
+                      situacaoFilter === null ? 'bg-[#26322c] text-white' : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
                     }`}
                   >
                     Todos
@@ -266,8 +268,8 @@ export default function ProdutosPage() {
                     <button
                       key={key}
                       onClick={() => setSituacaoFilter(key)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        situacaoFilter === key ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'
+                      className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
+                        situacaoFilter === key ? 'bg-[#26322c] text-white' : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
                       }`}
                     >
                       {s.label}
@@ -276,20 +278,20 @@ export default function ProdutosPage() {
                 </div>
 
                 {/* Busca */}
-                <div className="flex items-center bg-[#121215] border border-white/10 rounded-xl px-4 py-2 flex-1 min-w-[200px] gap-2">
+                <div className="field flex min-w-[200px] flex-1 items-center gap-2 px-4 py-2">
                   <Search className="w-4 h-4 text-gray-500 shrink-0" />
                   <input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Buscar por nome ou código..."
-                    className="bg-transparent border-none outline-none text-sm text-white placeholder-gray-600 w-full"
+                    className="w-full border-none bg-transparent text-sm outline-none placeholder:text-[#9a9d97]"
                   />
                 </div>
               </div>
 
               {/* Tabela de produtos */}
-              <div className="bg-[#121215] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+              <div className="data-table">
                 {error && (
                   <div className="p-4 bg-red-500/10 border-b border-red-500/20 flex items-center gap-3 text-red-400 text-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -306,7 +308,7 @@ export default function ProdutosPage() {
                 ) : (
                   <>
                     {/* Header */}
-                    <div className="hidden md:grid grid-cols-[50px_100px_1fr_100px_120px_110px] gap-4 px-6 py-3 border-b border-white/5 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="hidden grid-cols-[50px_100px_1fr_100px_120px_110px] gap-4 border-b border-[#dedfd8] bg-[#f4f4ef] px-6 py-3 text-[11px] font-semibold text-[#737770] md:grid">
                       <span>#</span>
                       <span>Código</span>
                       <span>Produto</span>
@@ -315,7 +317,7 @@ export default function ProdutosPage() {
                       <span className="text-right">Preço</span>
                     </div>
 
-                    <div className="divide-y divide-white/5">
+                    <div className="divide-y divide-[#e3e4dd]">
                       {paginatedProducts.map((product, i) => {
                         const sit = SITUACAO_STYLES[product.situacao || 'A'] || SITUACAO_STYLES['A'];
                         const estoque = product.estoque?.saldoFisicoTotal ?? null;
@@ -330,7 +332,7 @@ export default function ProdutosPage() {
                         return (
                           <div
                             key={product.id}
-                            className="grid grid-cols-1 md:grid-cols-[50px_100px_1fr_100px_120px_110px] gap-2 md:gap-4 px-6 py-4 hover:bg-white/[0.02] transition-colors items-center"
+                            className="data-table-row grid grid-cols-1 items-center gap-2 px-6 py-4 md:grid-cols-[50px_100px_1fr_100px_120px_110px] md:gap-4"
                           >
                             <span className="hidden md:block text-xs text-gray-600 font-mono">
                               {(currentPage - 1) * PAGE_SIZE + i + 1}
@@ -341,7 +343,7 @@ export default function ProdutosPage() {
                             </span>
 
                             <div className="min-w-0">
-                              <p className="text-sm text-gray-200 font-medium truncate">{product.nome}</p>
+                              <p className="truncate text-sm font-medium text-[#31342f]">{product.nome}</p>
                               {product.tipo && (
                                 <p className="text-xs text-gray-600 mt-0.5">{product.tipo}</p>
                               )}
@@ -362,7 +364,7 @@ export default function ProdutosPage() {
                             </div>
 
                             <div className="text-right">
-                              <span className="text-base font-bold text-white">
+                              <span className="data-number text-base font-semibold">
                                 {formatCurrency(product.preco || 0)}
                               </span>
                             </div>
@@ -373,7 +375,7 @@ export default function ProdutosPage() {
 
                     {/* Paginação */}
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
+                      <div className="flex items-center justify-between border-t border-[#dedfd8] px-6 py-4">
                         <p className="text-xs text-gray-500">
                           Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredProducts.length)} de {filteredProducts.length} produtos
                         </p>
@@ -381,7 +383,7 @@ export default function ProdutosPage() {
                           <button
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
-                            className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="icon-button border border-[#d7d8d0] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </button>
@@ -389,7 +391,7 @@ export default function ProdutosPage() {
                           <button
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="icon-button border border-[#d7d8d0] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <ChevronRight className="w-4 h-4" />
                           </button>

@@ -103,42 +103,40 @@ export default function Oportunidades() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0a0c] text-white font-sans overflow-hidden">
+    <div className="app-shell">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col overflow-y-auto">
+      <main className="app-main">
         {/* Topbar */}
-        <header className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-[#121215]/80 backdrop-blur-md sticky top-0 z-10">
+        <header className="app-topbar">
           <div className="flex items-center gap-3">
-            <Activity className="w-5 h-5 text-indigo-400" />
-            <h2 className="font-bold text-lg">Inteligência de Mercado</h2>
+            <Activity className="h-[18px] w-[18px] text-[#176b57]" />
+            <h2 className="text-sm font-semibold">Pesquisa de mercado</h2>
           </div>
           <div className="flex items-center gap-4">
-            <button className="p-2 relative rounded-full hover:bg-white/5 transition-colors">
-              <Bell className="w-5 h-5 text-gray-400" />
+            <button className="icon-button" aria-label="Notificações">
+              <Bell className="h-[18px] w-[18px]" />
             </button>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 border-2 border-[#0a0a0c] cursor-pointer flex items-center justify-center text-xs font-bold">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#26322c] text-[11px] font-semibold text-white">
               AD
             </div>
           </div>
         </header>
 
-        <div className="p-8 max-w-7xl mx-auto w-full space-y-8">
+        <div className="app-content space-y-7">
           {/* Título e Busca */}
-          <div className="text-center max-w-2xl mx-auto">
-            <h1 className="text-3xl font-bold flex items-center justify-center gap-3">
-              <Activity className="text-indigo-500" />
-              Radar de Oportunidades
-            </h1>
-            <p className="text-gray-400 mt-2 mb-8">
-              Digite o nome de um produto e a IA vai analisar preços, concorrência e oportunidades em tempo real no Mercado Livre.
+          <div className="max-w-4xl">
+            <p className="page-kicker mb-3">Mercado Livre</p>
+            <h1 className="page-title">Radar de oportunidades</h1>
+            <p className="page-description mb-7 mt-2">
+              Pesquise um produto para comparar preços, concorrentes e sinais de demanda no Mercado Livre.
             </p>
 
             {/* Campo de busca com histórico */}
             <div className="relative">
               <form onSubmit={handleSubmit}>
-                <div className="flex items-center bg-[#121215] border-2 border-white/10 rounded-2xl px-5 py-4 focus-within:border-indigo-500 transition-colors shadow-xl">
-                  <Search className="w-5 h-5 text-gray-500 shrink-0" />
+                <div className="surface flex items-center px-4 py-3 focus-within:border-[#176b57]">
+                  <Search className="h-[18px] w-[18px] shrink-0 text-[#7b7f78]" />
                   <input 
                     type="text"
                     value={searchTerm}
@@ -146,14 +144,14 @@ export default function Oportunidades() {
                     onFocus={() => history.length > 0 && setShowHistory(true)}
                     onBlur={() => setTimeout(() => setShowHistory(false), 150)}
                     placeholder="Ex: bolsa feminina couro legítimo, cinto corrente dourado..."
-                    className="bg-transparent border-none outline-none ml-3 text-white placeholder-gray-600 w-full text-lg"
+                    className="ml-3 w-full border-none bg-transparent text-base text-[#20221f] outline-none placeholder:text-[#9a9d97]"
                     disabled={loading}
                   />
                   {history.length > 0 && (
                     <button
                       type="button"
                       onClick={() => setShowHistory(v => !v)}
-                      className="p-2 rounded-lg text-gray-500 hover:text-indigo-400 hover:bg-white/5 transition-colors shrink-0 mr-1"
+                      className="icon-button mr-1 shrink-0"
                       title="Histórico de buscas"
                     >
                       <History className="w-4 h-4" />
@@ -162,7 +160,7 @@ export default function Oportunidades() {
                   <button 
                     type="submit" 
                     disabled={loading || !searchTerm.trim()}
-                    className="ml-1 px-6 py-2 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-medium rounded-xl transition-all text-sm shrink-0"
+                    className="button-primary ml-1 shrink-0 px-5 text-sm disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {loading ? 'Analisando...' : 'Pesquisar'}
                   </button>
@@ -171,14 +169,14 @@ export default function Oportunidades() {
 
               {/* Dropdown do histórico */}
               {showHistory && history.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-[#1a1a20] border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/5">
-                    <span className="text-xs text-gray-500 font-medium flex items-center gap-2">
+                <div className="surface absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden shadow-[0_16px_40px_rgba(30,36,32,0.14)]">
+                  <div className="flex items-center justify-between border-b border-[#dedfd8] px-4 py-2.5">
+                    <span className="flex items-center gap-2 text-xs font-medium text-[#737770]">
                       <Clock className="w-3.5 h-3.5" /> Buscas recentes
                     </span>
                     <button
                       onClick={clearHistory}
-                      className="text-xs text-gray-600 hover:text-red-400 transition-colors"
+                      className="text-xs text-[#858981] hover:text-[#9b3b2d]"
                     >
                       Limpar tudo
                     </button>
@@ -186,10 +184,10 @@ export default function Oportunidades() {
                   {history.map((term, i) => (
                     <div
                       key={i}
-                      className="flex items-center justify-between px-4 py-2.5 hover:bg-white/5 transition-colors group"
+                      className="group flex items-center justify-between px-4 py-2.5 hover:bg-[#f2f2ed]"
                     >
                       <button
-                        className="flex items-center gap-3 text-left flex-1 text-sm text-gray-300 hover:text-white transition-colors"
+                        className="flex flex-1 items-center gap-3 text-left text-sm text-[#4d514b] hover:text-[#20221f]"
                         onClick={() => handleSearch(term)}
                       >
                         <Search className="w-3.5 h-3.5 text-gray-600 shrink-0" />
@@ -197,7 +195,7 @@ export default function Oportunidades() {
                       </button>
                       <button
                         onClick={() => removeFromHistory(term)}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-white/10 text-gray-600 hover:text-red-400 transition-all"
+                        className="rounded-[3px] p-1 text-[#92958f] opacity-0 hover:bg-[#e6e6df] hover:text-[#9b3b2d] group-hover:opacity-100"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -209,12 +207,12 @@ export default function Oportunidades() {
 
             {/* Chips de sugestão rápida */}
             {!result && !loading && (
-              <div className="flex flex-wrap gap-2 justify-center mt-4">
+              <div className="mt-4 flex flex-wrap gap-2">
                 {['bolsa clutch festa', 'cinto couro fivela', 'fone bluetooth', 'mochila masculina'].map(s => (
                   <button
                     key={s}
                     onClick={() => handleSearch(s)}
-                    className="px-3 py-1.5 bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-300 text-xs rounded-full transition-all"
+                    className="rounded-[4px] border border-[#d7d8d0] bg-[#fbfbf8] px-3 py-1.5 text-xs text-[#666a63] hover:border-[#91b7a8] hover:text-[#176b57]"
                   >
                     {s}
                   </button>
@@ -226,17 +224,17 @@ export default function Oportunidades() {
           {/* Loading */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-20 space-y-6">
-              <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#b9c9c2] border-t-[#176b57]"></div>
               <div className="text-center">
-                <p className="text-indigo-400 animate-pulse font-medium text-lg">Analisando &quot;{searchTerm}&quot;...</p>
-                <p className="text-gray-500 text-sm mt-2">Raspando preços do Mercado Livre e consultando a IA. Aguarde até 30s.</p>
+                <p className="text-base font-medium text-[#31433c]">Analisando &quot;{searchTerm}&quot;...</p>
+                <p className="mt-2 text-sm text-[#777b74]">Consultando preços e anúncios do Mercado Livre. Isso pode levar alguns segundos.</p>
               </div>
             </div>
           )}
 
           {/* Erro */}
           {error && !loading && (
-            <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 text-red-400 flex items-start gap-4">
+            <div className="flex items-start gap-4 rounded-[6px] border border-[#d9aaa0] bg-[#f7e7e3] p-6 text-[#8a3326]">
               <AlertTriangle className="w-8 h-8 shrink-0 mt-1" />
               <div>
                 <h3 className="font-bold text-lg mb-1">Falha na análise</h3>
@@ -249,21 +247,21 @@ export default function Oportunidades() {
           {result && !loading && (
             <div className="space-y-6">
               {/* Header do resultado */}
-              <div className="bg-[#121215] border border-white/10 rounded-2xl p-5 flex items-center justify-between">
+              <div className="surface flex items-center justify-between p-5">
                 <div>
-                  <span className="text-sm text-gray-400">Resultados para</span>
-                  <h2 className="text-xl font-bold text-white">&quot;{result.query}&quot;</h2>
+                  <span className="text-sm text-[#737770]">Resultados para</span>
+                  <h2 className="text-xl font-semibold text-[#20221f]">&quot;{result.query}&quot;</h2>
                 </div>
-                <span className="text-sm text-gray-500 bg-white/5 px-4 py-2 rounded-lg">{result.totalResults}</span>
+                <span className="rounded-[4px] bg-[#ecece5] px-4 py-2 text-sm text-[#666a63]">{result.totalResults}</span>
               </div>
 
               {/* Tabs */}
-              <div className="flex gap-2 border-b border-white/10 pb-1">
-                <button onClick={() => setActiveTab('report')} className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'report' ? 'bg-indigo-500/20 text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'}`}>
-                  📊 Análise da IA
+              <div className="flex gap-1 border-b border-[#d7d8d0]">
+                <button onClick={() => setActiveTab('report')} className={`border-b-2 px-4 py-2.5 text-sm font-medium ${activeTab === 'report' ? 'border-[#176b57] text-[#176b57]' : 'border-transparent text-[#737770] hover:text-[#20221f]'}`}>
+                  Análise
                 </button>
-                <button onClick={() => setActiveTab('data')} className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${activeTab === 'data' ? 'bg-indigo-500/20 text-indigo-400 border-b-2 border-indigo-500' : 'text-gray-400 hover:text-white'}`}>
-                  🔍 Anúncios Encontrados ({result.products.length})
+                <button onClick={() => setActiveTab('data')} className={`border-b-2 px-4 py-2.5 text-sm font-medium ${activeTab === 'data' ? 'border-[#176b57] text-[#176b57]' : 'border-transparent text-[#737770] hover:text-[#20221f]'}`}>
+                  Anúncios encontrados ({result.products.length})
                 </button>
               </div>
 
@@ -271,14 +269,14 @@ export default function Oportunidades() {
               {activeTab === 'report' && result.report && (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {/* Oportunidades */}
-                  <div className="bg-gradient-to-br from-[#121215] to-[#1a1a24] border border-indigo-500/20 rounded-2xl p-6 shadow-xl">
-                    <h2 className="text-xl font-bold text-indigo-400 mb-6 flex items-center gap-2">
-                      <Lightbulb className="w-6 h-6 text-yellow-400" /> Oportunidades
+                  <div className="surface p-6">
+                    <h2 className="mb-6 flex items-center gap-2 text-lg font-semibold text-[#20221f]">
+                      <Lightbulb className="h-5 w-5 text-[#a25714]" /> Oportunidades
                     </h2>
                     <div className="space-y-4">
                       {result.report.opportunities?.map((opp, i) => (
-                        <div key={i} className="bg-indigo-500/10 border border-indigo-500/20 p-5 rounded-xl">
-                          <p className="text-gray-200 text-sm leading-relaxed">{opp}</p>
+                        <div key={i} className="rounded-[5px] border border-[#d7d8d0] bg-[#f4f4ef] p-5">
+                          <p className="text-sm leading-relaxed text-[#4d514b]">{opp}</p>
                         </div>
                       ))}
                     </div>
@@ -286,28 +284,28 @@ export default function Oportunidades() {
 
                   <div className="space-y-6">
                     {/* Tendências */}
-                    <div className="bg-[#121215] border border-white/10 rounded-2xl p-6 shadow-xl">
-                      <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-green-400" /> Visão de Mercado
+                    <div className="surface p-6">
+                      <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#20221f]">
+                        <TrendingUp className="h-5 w-5 text-[#176b57]" /> Visão de mercado
                       </h2>
                       <ul className="space-y-3">
                         {result.report.trends?.map((trend, i) => (
-                          <li key={i} className="flex gap-3 text-sm text-gray-400 leading-relaxed">
-                            <span className="text-green-500 mt-0.5">•</span> {trend}
+                          <li key={i} className="flex gap-3 text-sm leading-relaxed text-[#5f635c]">
+                            <span className="mt-0.5 text-[#176b57]">•</span> {trend}
                           </li>
                         ))}
                       </ul>
                     </div>
 
                     {/* Ameaças */}
-                    <div className="bg-[#1c1212] border border-red-500/20 rounded-2xl p-6 shadow-xl">
-                      <h2 className="text-lg font-semibold text-red-400 mb-4 flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5" /> Pontos de Atenção
+                    <div className="rounded-[6px] border border-[#dfb8af] bg-[#f7e7e3] p-6">
+                      <h2 className="mb-4 flex items-center gap-2 text-base font-semibold text-[#8a3326]">
+                        <AlertTriangle className="h-5 w-5" /> Pontos de atenção
                       </h2>
                       <ul className="space-y-3">
                         {result.report.threats?.map((threat, i) => (
-                          <li key={i} className="flex gap-3 text-sm text-gray-400 leading-relaxed">
-                            <span className="text-red-500 mt-0.5 text-lg leading-none">!</span> {threat}
+                          <li key={i} className="flex gap-3 text-sm leading-relaxed text-[#694b45]">
+                            <span className="mt-0.5 text-lg leading-none text-[#a44435]">!</span> {threat}
                           </li>
                         ))}
                       </ul>
@@ -320,11 +318,11 @@ export default function Oportunidades() {
               {activeTab === 'data' && (
                 <div className="space-y-3">
                   {result.products.map((p, i) => (
-                    <div key={i} className="bg-[#121215] border border-white/10 rounded-xl p-4 flex items-center justify-between gap-4 hover:border-indigo-500/30 transition-colors">
+                    <div key={i} className="surface data-table-row flex items-center justify-between gap-4 p-4">
                       <div className="flex items-center gap-4 flex-1 min-w-0">
                         <span className="text-xs text-gray-600 font-mono w-5 shrink-0">#{i + 1}</span>
                         <div className="min-w-0">
-                          <p className="text-sm text-gray-200 font-medium truncate">{p.title}</p>
+                          <p className="truncate text-sm font-medium text-[#31342f]">{p.title}</p>
                           <div className="flex items-center gap-3 mt-1">
                             <span className="text-xs text-gray-500">{p.seller}</span>
                             {p.freeShipping && (
@@ -336,7 +334,7 @@ export default function Oportunidades() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-lg font-bold text-white">{p.price}</span>
+                        <span className="data-number text-lg font-semibold">{p.price}</span>
                         {p.link && (
                           <a href={p.link} target="_blank" rel="noopener noreferrer" className="p-2 hover:bg-white/10 rounded-lg transition-colors" title="Ver no Mercado Livre">
                             <ExternalLink className="w-4 h-4 text-gray-400" />

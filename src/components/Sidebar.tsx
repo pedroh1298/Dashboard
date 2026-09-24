@@ -4,47 +4,49 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  BarChart3,
+  LayoutDashboard,
   Package,
   ShoppingCart,
   Settings,
   LogOut,
-  Sparkles,
-  Activity,
+  Radar,
   Menu,
   X,
 } from 'lucide-react';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: BarChart3 },
+  { href: '/', label: 'Visão geral', icon: LayoutDashboard },
   { href: '/produtos', label: 'Produtos', icon: Package },
   { href: '/pedidos', label: 'Pedidos', icon: ShoppingCart },
-  { href: '/oportunidades', label: 'Oportunidades', icon: Activity },
+  { href: '/oportunidades', label: 'Mercado', icon: Radar },
 ];
 
 function SidebarContent({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-6 flex items-center gap-3">
-        <div className="w-8 h-8 rounded bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-          <Sparkles className="w-4 h-4 text-white" />
+    <div className="flex h-full flex-col">
+      <div className="flex h-20 items-center gap-3 border-b border-white/10 px-5">
+        <div className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-white/20 bg-white/5 text-sm font-bold text-white">
+          V
         </div>
-        <span className="text-xl font-bold tracking-tight">
-          Vortex<span className="text-indigo-400">AI</span>
-        </span>
+        <div className="leading-none">
+          <span className="block text-[15px] font-semibold text-white">VortexAI</span>
+          <span className="mt-1 block text-[10px] font-medium uppercase tracking-[0.14em] text-[#96a098]">Operações</span>
+        </div>
         {onClose && (
           <button
             onClick={onClose}
-            className="ml-auto p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors md:hidden"
+            className="ml-auto rounded-[4px] p-1.5 text-[#aeb6af] hover:bg-white/10 hover:text-white md:hidden"
+            aria-label="Fechar menu"
           >
             <X className="w-5 h-5" />
           </button>
         )}
       </div>
 
-      <nav className="flex-1 px-4 py-4 space-y-1">
+      <nav className="flex-1 space-y-1 px-3 py-6" aria-label="Navegação principal">
+        <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#737d75]">Navegação</p>
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href;
           return (
@@ -52,37 +54,37 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
               key={href}
               href={href}
               onClick={onClose}
-              className={`flex items-center gap-3 px-3 py-2 rounded-lg font-medium transition-colors ${
+              className={`relative flex items-center gap-3 rounded-[4px] px-3 py-2.5 text-sm font-medium ${
                 isActive
-                  ? 'bg-indigo-500/10 text-indigo-400'
-                  : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-white/10 text-white before:absolute before:left-0 before:h-5 before:w-0.5 before:bg-[#7fc3aa]'
+                  : 'text-[#aeb6af] hover:bg-white/[0.06] hover:text-white'
               }`}
             >
-              <Icon className="w-5 h-5" />
+              <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
               {label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="p-4 mt-auto space-y-1">
+      <div className="mt-auto space-y-1 border-t border-white/10 p-3">
         <Link
           href="/configuracoes"
           onClick={onClose}
-          className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+          className={`flex items-center gap-3 rounded-[4px] px-3 py-2.5 text-sm ${
             pathname === '/configuracoes'
-              ? 'bg-indigo-500/10 text-indigo-400 font-medium'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
+              ? 'bg-white/10 font-medium text-white'
+              : 'text-[#aeb6af] hover:bg-white/[0.06] hover:text-white'
           }`}
         >
-          <Settings className="w-5 h-5" />
+          <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
           Configurações
         </Link>
         <a
           href="/api/auth/logout"
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-red-400 hover:bg-red-400/10 transition-colors"
+          className="flex items-center gap-3 rounded-[4px] px-3 py-2.5 text-sm text-[#c7aaa3] hover:bg-white/[0.06] hover:text-[#f1c1b5]"
         >
-          <LogOut className="w-5 h-5" />
+          <LogOut className="h-[18px] w-[18px]" strokeWidth={1.8} />
           Sair
         </a>
       </div>
@@ -98,7 +100,7 @@ export default function Sidebar() {
       {/* Botão hambúrguer - mobile */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-50 p-2.5 rounded-xl bg-[#121215] border border-white/10 text-gray-400 hover:text-white transition-colors shadow-lg"
+        className="fixed left-4 top-3 z-50 rounded-[5px] border border-[#39413b] bg-[#1e2420] p-2.5 text-[#c9cec9] hover:text-white md:hidden"
         aria-label="Abrir menu"
       >
         <Menu className="w-5 h-5" />
@@ -107,14 +109,14 @@ export default function Sidebar() {
       {/* Overlay mobile */}
       {mobileOpen && (
         <div
-          className="md:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+          className="fixed inset-0 z-40 bg-black/45 md:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Sidebar mobile (drawer) */}
       <aside
-        className={`md:hidden fixed inset-y-0 left-0 z-50 w-64 bg-[#121215] border-r border-white/10 transform transition-transform duration-300 ${
+        className={`fixed inset-y-0 left-0 z-50 w-60 border-r border-black/20 bg-[#1e2420] transition-transform duration-200 md:hidden ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -122,7 +124,7 @@ export default function Sidebar() {
       </aside>
 
       {/* Sidebar desktop */}
-      <aside className="hidden md:flex w-64 bg-[#121215] border-r border-white/10 flex-col flex-shrink-0">
+      <aside className="hidden w-60 flex-shrink-0 flex-col border-r border-black/20 bg-[#1e2420] md:flex">
         <SidebarContent />
       </aside>
     </>

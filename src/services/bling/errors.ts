@@ -28,7 +28,7 @@ export function userMessageForBlingStatus(status: number, bodySnippet?: string):
     return 'Sessão do Bling expirada ou inválida. Reconecte sua conta.';
   }
   if (status === 403) {
-    return 'Permissão insuficiente no Bling. Revise os escopos do aplicativo (Pedidos de Venda, Produtos e Estoques) e autorize novamente.';
+    return 'Permissão insuficiente no Bling. No cadastro do aplicativo, mantenha somente os escopos Pedidos de Venda e Produtos e autorize novamente com um usuário administrador.';
   }
   if (status === 429) {
     return 'O Bling limitou as requisições no momento. Aguarde alguns segundos e tente de novo.';
@@ -40,7 +40,7 @@ export function userMessageForBlingStatus(status: number, bodySnippet?: string):
     return 'A comunicação com o Bling excedeu o tempo limite.';
   }
   if (bodySnippet && /token/i.test(bodySnippet) && /n[aã]o autorizado|unauthorized|forbidden/i.test(bodySnippet)) {
-    return 'Permissão insuficiente no Bling. Reconecte o aplicativo e confirme os escopos autorizados.';
+    return 'Permissão insuficiente no Bling. Mantenha somente os escopos Pedidos de Venda e Produtos e reconecte o aplicativo.';
   }
   return 'Não foi possível consultar o Bling.';
 }

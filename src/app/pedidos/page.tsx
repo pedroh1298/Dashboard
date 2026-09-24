@@ -35,11 +35,11 @@ interface BlingOrder {
 }
 
 const SITUACOES: Record<number, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  6:  { label: 'Em aberto',        color: 'text-yellow-400',  bg: 'bg-yellow-500/10 border-yellow-500/30',  icon: <Clock className="w-3.5 h-3.5" /> },
-  9:  { label: 'Atendido',         color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/30', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
-  11: { label: 'Cancelado',        color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/30',        icon: <XCircle className="w-3.5 h-3.5" /> },
-  12: { label: 'Em andamento',     color: 'text-blue-400',    bg: 'bg-blue-500/10 border-blue-500/30',      icon: <TrendingUp className="w-3.5 h-3.5" /> },
-  15: { label: 'Em digitação',     color: 'text-gray-400',    bg: 'bg-gray-500/10 border-gray-500/30',      icon: <Clock className="w-3.5 h-3.5" /> },
+  6:  { label: 'Em aberto',    color: 'text-[#8a5a12]', bg: 'bg-[#f5ead6] border-[#dfc99e]', icon: <Clock className="w-3.5 h-3.5" /> },
+  9:  { label: 'Atendido',     color: 'text-[#176b57]', bg: 'bg-[#e5f1ec] border-[#b9d5ca]', icon: <CheckCircle2 className="w-3.5 h-3.5" /> },
+  11: { label: 'Cancelado',    color: 'text-[#9b3b2d]', bg: 'bg-[#f7e7e3] border-[#dfb8af]', icon: <XCircle className="w-3.5 h-3.5" /> },
+  12: { label: 'Em andamento', color: 'text-[#315d74]', bg: 'bg-[#e3edf1] border-[#bfd0d8]', icon: <TrendingUp className="w-3.5 h-3.5" /> },
+  15: { label: 'Em digitação', color: 'text-[#666a63]', bg: 'bg-[#ecece5] border-[#d5d6ce]', icon: <Clock className="w-3.5 h-3.5" /> },
 };
 
 const PERIOD_OPTIONS = [
@@ -50,8 +50,8 @@ const PERIOD_OPTIONS = [
 ];
 
 function getSituacaoStyle(id?: number) {
-  if (!id) return { label: 'Desconhecido', color: 'text-gray-400', bg: 'bg-gray-500/10 border-gray-500/30', icon: <Clock className="w-3.5 h-3.5" /> };
-  return SITUACOES[id] || { label: `Situação ${id}`, color: 'text-gray-400', bg: 'bg-gray-500/10 border-gray-500/30', icon: <Clock className="w-3.5 h-3.5" /> };
+  if (!id) return { label: 'Desconhecido', color: 'text-[#666a63]', bg: 'bg-[#ecece5] border-[#d5d6ce]', icon: <Clock className="w-3.5 h-3.5" /> };
+  return SITUACOES[id] || { label: `Situação ${id}`, color: 'text-[#666a63]', bg: 'bg-[#ecece5] border-[#d5d6ce]', icon: <Clock className="w-3.5 h-3.5" /> };
 }
 
 function formatCurrency(val: number) {
@@ -148,52 +148,58 @@ export default function PedidosPage() {
   };
 
   return (
-    <div className="flex h-screen bg-[#0a0a0c] text-white font-sans overflow-hidden">
+    <div className="app-shell">
       <Sidebar />
 
-      <main className="flex-1 flex flex-col overflow-y-auto relative">
+      <main className="app-main">
         {/* Topbar */}
-        <header className="h-20 border-b border-white/10 flex items-center justify-between px-8 bg-[#121215]/80 backdrop-blur-md sticky top-0 z-10">
+        <header className="app-topbar">
           <div className="flex items-center gap-3">
-            <ShoppingCart className="w-5 h-5 text-indigo-400" />
-            <h1 className="font-bold text-lg">Pedidos de Venda</h1>
+            <ShoppingCart className="h-[18px] w-[18px] text-[#176b57]" />
+            <h1 className="text-sm font-semibold">Pedidos de venda</h1>
           </div>
           <div className="flex items-center gap-4">
             <button
               onClick={() => { setLoading(true); fetchOrders(selectedPeriod); }}
               disabled={syncing}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors text-sm disabled:opacity-50"
+              className="button-secondary px-3 text-xs disabled:opacity-50"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               Atualizar
             </button>
-            <button className="p-2 rounded-full hover:bg-white/5 transition-colors">
-              <Bell className="w-5 h-5 text-gray-400" />
+            <button className="icon-button" aria-label="Notificações">
+              <Bell className="h-[18px] w-[18px]" />
             </button>
-            <div className="w-9 h-9 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 border-2 border-[#0a0a0c] flex items-center justify-center text-xs font-bold">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#26322c] text-[11px] font-semibold text-white">
               AD
             </div>
           </div>
         </header>
 
-        <div className="p-6 md:p-8 max-w-7xl mx-auto w-full space-y-6">
+        <div className="app-content space-y-6">
+
+          <div>
+            <p className="page-kicker mb-3">Vendas</p>
+            <h2 className="page-title">Pedidos</h2>
+            <p className="page-description mt-2">Acompanhe o volume, o faturamento e o andamento dos pedidos registrados no Bling.</p>
+          </div>
 
           {/* Loading state */}
           {loading && (
             <div className="flex flex-col items-center justify-center py-32 gap-4">
-              <Loader2 className="w-10 h-10 text-indigo-400 animate-spin" />
-              <p className="text-gray-400 text-sm animate-pulse">Buscando pedidos no Bling ERP...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-[#176b57]" />
+              <p className="text-sm text-[#6f736d]">Buscando pedidos no Bling ERP...</p>
             </div>
           )}
 
           {!loading && !connectedBling && (
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-8 flex flex-col items-center text-center gap-4">
-              <AlertCircle className="w-10 h-10 text-amber-400" />
+            <div className="surface flex flex-col items-center gap-4 p-8 text-center">
+              <AlertCircle className="h-9 w-9 text-[#a25714]" />
               <div>
-                <h3 className="font-bold text-lg text-amber-300">Bling ERP não conectado</h3>
-                <p className="text-gray-400 text-sm mt-1">Conecte sua conta do Bling no Dashboard para visualizar os pedidos.</p>
+                <h3 className="text-lg font-semibold text-[#20221f]">Bling ERP não conectado</h3>
+                <p className="mt-1 text-sm text-[#6f736d]">Conecte sua conta do Bling no painel para visualizar os pedidos.</p>
               </div>
-              <Link href="/" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-all">
+              <Link href="/" className="button-primary px-5 text-sm">
                 Ir para o Dashboard
               </Link>
             </div>
@@ -204,16 +210,16 @@ export default function PedidosPage() {
               {/* Filtros */}
               <div className="flex flex-col sm:flex-row gap-4 flex-wrap">
                 {/* Período */}
-                <div className="flex items-center gap-2 bg-[#121215] border border-white/10 rounded-xl p-1">
+                <div className="surface flex items-center gap-1 p-1">
                   <Calendar className="w-4 h-4 text-gray-500 ml-2" />
                   {PERIOD_OPTIONS.map(opt => (
                     <button
                       key={opt.days}
                       onClick={() => handlePeriodChange(opt.days)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
                         selectedPeriod === opt.days
-                          ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                          : 'text-gray-400 hover:text-white'
+                          ? 'bg-[#26322c] text-white'
+                          : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
                       }`}
                     >
                       {opt.label}
@@ -222,12 +228,12 @@ export default function PedidosPage() {
                 </div>
 
                 {/* Situação */}
-                <div className="flex items-center gap-2 bg-[#121215] border border-white/10 rounded-xl p-1 flex-wrap">
+                <div className="surface flex flex-wrap items-center gap-1 p-1">
                   <Filter className="w-4 h-4 text-gray-500 ml-2" />
                   <button
                     onClick={() => setSelectedSituacao(null)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                      selectedSituacao === null ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'
+                    className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
+                      selectedSituacao === null ? 'bg-[#26322c] text-white' : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
                     }`}
                   >
                     Todos
@@ -236,8 +242,8 @@ export default function PedidosPage() {
                     <button
                       key={id}
                       onClick={() => setSelectedSituacao(Number(id))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        selectedSituacao === Number(id) ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'
+                      className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
+                        selectedSituacao === Number(id) ? 'bg-[#26322c] text-white' : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
                       }`}
                     >
                       {s.label}
@@ -246,41 +252,41 @@ export default function PedidosPage() {
                 </div>
 
                 {/* Busca */}
-                <div className="flex items-center bg-[#121215] border border-white/10 rounded-xl px-4 py-2 flex-1 min-w-[200px] gap-2">
+                <div className="field flex min-w-[200px] flex-1 items-center gap-2 px-4 py-2">
                   <Search className="w-4 h-4 text-gray-500 shrink-0" />
                   <input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Buscar por número, cliente..."
-                    className="bg-transparent border-none outline-none text-sm text-white placeholder-gray-600 w-full"
+                    className="w-full border-none bg-transparent text-sm outline-none placeholder:text-[#9a9d97]"
                   />
                 </div>
               </div>
 
               {/* Cards de resumo */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">Total de Pedidos</p>
-                  <p className="text-2xl font-bold">{filteredOrders.length}</p>
-                  <p className="text-xs text-gray-500 mt-1">{selectedPeriod} dias</p>
+              <div className="metric-strip grid-cols-2 lg:grid-cols-4">
+                <div className="metric-cell">
+                  <p className="mb-1 text-xs text-[#737770]">Total de pedidos</p>
+                  <p className="data-number text-2xl font-semibold">{filteredOrders.length}</p>
+                  <p className="mt-1 text-xs text-[#858981]">{selectedPeriod} dias</p>
                 </div>
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">Faturamento</p>
-                  <p className="text-xl font-bold text-emerald-400">{formatCurrency(totalFaturamento)}</p>
-                  <p className="text-xs text-gray-500 mt-1">período filtrado</p>
+                <div className="metric-cell">
+                  <p className="mb-1 text-xs text-[#737770]">Faturamento</p>
+                  <p className="data-number text-xl font-semibold text-[#176b57]">{formatCurrency(totalFaturamento)}</p>
+                  <p className="mt-1 text-xs text-[#858981]">período filtrado</p>
                 </div>
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">Ticket Médio</p>
-                  <p className="text-xl font-bold text-indigo-400">{formatCurrency(ticketMedio)}</p>
-                  <p className="text-xs text-gray-500 mt-1">por pedido</p>
+                <div className="metric-cell">
+                  <p className="mb-1 text-xs text-[#737770]">Ticket médio</p>
+                  <p className="data-number text-xl font-semibold">{formatCurrency(ticketMedio)}</p>
+                  <p className="mt-1 text-xs text-[#858981]">por pedido</p>
                 </div>
-                <div className="bg-[#121215] border border-white/10 rounded-xl p-4">
-                  <p className="text-xs text-gray-400 mb-1">Atendidos</p>
-                  <p className="text-2xl font-bold text-emerald-400">
+                <div className="metric-cell">
+                  <p className="mb-1 text-xs text-[#737770]">Atendidos</p>
+                  <p className="data-number text-2xl font-semibold text-[#176b57]">
                     {filteredOrders.filter(o => o.situacao?.id === 9).length}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="mt-1 text-xs text-[#858981]">
                     {filteredOrders.length > 0
                       ? `${((filteredOrders.filter(o => o.situacao?.id === 9).length / filteredOrders.length) * 100).toFixed(0)}% do total`
                       : '-'}
@@ -289,7 +295,7 @@ export default function PedidosPage() {
               </div>
 
               {/* Tabela */}
-              <div className="bg-[#121215] border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+              <div className="data-table">
                 {error && (
                   <div className="p-4 bg-red-500/10 border-b border-red-500/20 flex items-center gap-3 text-red-400 text-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -306,7 +312,7 @@ export default function PedidosPage() {
                 ) : (
                   <>
                     {/* Header da tabela */}
-                    <div className="hidden md:grid grid-cols-[60px_100px_1fr_140px_120px_100px_60px] gap-4 px-6 py-3 border-b border-white/5 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="hidden grid-cols-[60px_100px_1fr_140px_120px_100px_60px] gap-4 border-b border-[#dedfd8] bg-[#f4f4ef] px-6 py-3 text-[11px] font-semibold text-[#737770] md:grid">
                       <span>#</span>
                       <span>Número</span>
                       <span>Cliente</span>
@@ -316,13 +322,13 @@ export default function PedidosPage() {
                       <span></span>
                     </div>
 
-                    <div className="divide-y divide-white/5">
+                    <div className="divide-y divide-[#e3e4dd]">
                       {paginatedOrders.map((order, i) => {
                         const sit = getSituacaoStyle(order.situacao?.id);
                         return (
                           <div
                             key={order.id}
-                            className="grid grid-cols-1 md:grid-cols-[60px_100px_1fr_140px_120px_100px_60px] gap-2 md:gap-4 px-6 py-4 hover:bg-white/[0.02] transition-colors items-center"
+                            className="data-table-row grid grid-cols-1 items-center gap-2 px-6 py-4 md:grid-cols-[60px_100px_1fr_140px_120px_100px_60px] md:gap-4"
                           >
                             {/* Index */}
                             <span className="hidden md:block text-xs text-gray-600 font-mono">
@@ -331,7 +337,7 @@ export default function PedidosPage() {
 
                             {/* Número */}
                             <div>
-                              <span className="font-mono text-sm text-indigo-300 font-bold">#{order.numero}</span>
+                              <span className="font-mono text-sm font-semibold text-[#176b57]">#{order.numero}</span>
                               {order.numeroLoja && (
                                 <p className="text-xs text-gray-600 mt-0.5">{order.numeroLoja}</p>
                               )}
@@ -339,7 +345,7 @@ export default function PedidosPage() {
 
                             {/* Cliente */}
                             <div className="min-w-0">
-                              <p className="text-sm text-gray-200 font-medium truncate">
+                              <p className="truncate text-sm font-medium text-[#31342f]">
                                 {order.contato?.nome || 'Cliente não informado'}
                               </p>
                               {order.itens && order.itens.length > 0 && (
@@ -366,7 +372,7 @@ export default function PedidosPage() {
 
                             {/* Total */}
                             <div className="text-right">
-                              <span className="text-base font-bold text-white">
+                              <span className="data-number text-base font-semibold">
                                 {formatCurrency(Number(order.total) || 0)}
                               </span>
                             </div>
@@ -377,7 +383,7 @@ export default function PedidosPage() {
                                 href={`https://www.bling.com.br/pedidos.php#id=${order.id}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-gray-500 hover:text-indigo-400"
+                                className="icon-button text-[#777b74] hover:text-[#176b57]"
                                 title="Ver no Bling"
                               >
                                 <ExternalLink className="w-4 h-4" />
@@ -390,7 +396,7 @@ export default function PedidosPage() {
 
                     {/* Paginação */}
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-between px-6 py-4 border-t border-white/10">
+                      <div className="flex items-center justify-between border-t border-[#dedfd8] px-6 py-4">
                         <p className="text-xs text-gray-500">
                           Mostrando {(currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredOrders.length)} de {filteredOrders.length} pedidos
                         </p>
@@ -398,7 +404,7 @@ export default function PedidosPage() {
                           <button
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             disabled={currentPage === 1}
-                            className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="icon-button border border-[#d7d8d0] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </button>
@@ -406,7 +412,7 @@ export default function PedidosPage() {
                           <button
                             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                             disabled={currentPage === totalPages}
-                            className="p-1.5 rounded-lg border border-white/10 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                            className="icon-button border border-[#d7d8d0] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             <ChevronRight className="w-4 h-4" />
                           </button>
