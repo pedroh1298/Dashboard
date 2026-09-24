@@ -188,3 +188,30 @@ export class MemoryTokenStore implements TokenStore {
     this.record = null;
   }
 }
+export class MigratingTokenStore implements TokenStore {
+  constructor(
+    private readonly primary: TokenStore,
+    private readonly fallback: TokenStore
+  ) {}
+
+  async get(): Promise<BlingIntegrationRecord | null> {
+    const primaryRecord = await this.primary.get();
+    if (primaryRecord) return primaryRecord;
+
+    const fallbackRecord = await this.fallback.get();
+    if (!fallbackRecord) return null;
+
+    await this.primary.save(fallbackRecord);
+    return fallbackRecord;
+  }
+
+  async save(record: BlingIntegrationRecord): Promise<void> {
+    await this.primary.save(record);
+    await this.fallback.save(record);
+  }
+
+  async clear(): Promise<void> {
+    await this.primary.clear();
+    await this.fallback.clear();
+  }
+}

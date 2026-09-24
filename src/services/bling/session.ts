@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers';
 import type { NextResponse } from 'next/server';
 import { OAUTH_STATE_COOKIE, OAUTH_STATE_TTL_SECONDS } from './constants';
-import { CookieTokenStore, type TokenStore } from './tokenStore';
+import { isSupabaseTokenStoreConfigured, SupabaseTokenStore } from './supabaseTokenStore';
+import { CookieTokenStore, MigratingTokenStore, type TokenStore } from './tokenStore';
 
 function stateCookieOptions() {
   return {
@@ -11,6 +12,11 @@ function stateCookieOptions() {
     path: '/',
     maxAge: OAUTH_STATE_TTL_SECONDS,
   };
+}
+
+function withPersistentStorage(cookieStore: CookieTokenStore): TokenStore {
+  if (!isSupabaseTokenStoreConfigured()) return cookieStore;
+  return new MigratingTokenStore(new SupabaseTokenStore(), cookieStore);
 }
 
 export function createOAuthState(): string {
@@ -34,9 +40,9 @@ export async function getRequestOAuthState(): Promise<string | undefined> {
 
 export async function createRequestTokenStore(): Promise<TokenStore> {
   const jar = await cookies();
-  return new CookieTokenStore(jar);
+  return withPersistentStorage(new CookieTokenStore(jar));
 }
 
 export function createResponseTokenStore(response: NextResponse): TokenStore {
-  return new CookieTokenStore(response.cookies);
+  return withPersistentStorage(new CookieTokenStore(response.cookies));
 }

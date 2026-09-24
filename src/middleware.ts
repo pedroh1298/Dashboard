@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { hasAuthCookie } from '@/lib/auth';
 
-export function middleware(request: NextRequest) {
-  const isAuth = hasAuthCookie(request.headers.get('cookie'));
+export async function middleware(request: NextRequest) {
+  const isAuth = await hasAuthCookie(request.headers.get('cookie'));
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === '/login';
   const isBlingCallback = pathname === '/api/bling/callback';

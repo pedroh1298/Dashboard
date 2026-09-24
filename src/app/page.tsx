@@ -111,6 +111,13 @@ export default function Dashboard() {
         } else {
           setInsights([]);
         }
+
+        if (data.connected && data.message) {
+          setToastMessage({
+            type: 'error',
+            text: data.message,
+          });
+        }
       }
     } catch (err) {
       console.error('Erro ao buscar dados do dashboard:', err);
@@ -127,7 +134,11 @@ export default function Dashboard() {
       setToastMessage({ type: 'success', text: 'Bling ERP conectado com sucesso!' });
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (urlParams.get('bling_error')) {
-      setToastMessage({ type: 'error', text: `Erro ao conectar Bling: ${urlParams.get('bling_error')}` });
+      const callbackMessage = urlParams.get('bling_message');
+      setToastMessage({
+        type: 'error',
+        text: callbackMessage || `Erro ao conectar Bling: ${urlParams.get('bling_error')}`,
+      });
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
