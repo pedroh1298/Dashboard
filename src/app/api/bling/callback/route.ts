@@ -66,9 +66,11 @@ export async function GET(request: Request) {
       ? error.userMessage
       : 'Não foi possível conectar ao Bling.';
     console.error('[API Bling Callback] Falha na troca de token:', error instanceof BlingApiError ? error.status : 'unknown');
-    return redirectHome(request.url, {
+    const errorResponse = redirectHome(request.url, {
       bling_error: 'token',
       bling_message: userMessage,
     });
+    clearOAuthStateCookie(errorResponse);
+    return errorResponse;
   }
 }

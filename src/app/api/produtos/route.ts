@@ -12,7 +12,14 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const pageParam = searchParams.get('pagina');
-  const pagina = pageParam ? Number(pageParam) : undefined;
+  const parsedPage = pageParam ? Number(pageParam) : undefined;
+  if (parsedPage !== undefined && (!Number.isInteger(parsedPage) || parsedPage < 1 || parsedPage > 100)) {
+    return NextResponse.json(
+      { success: false, error: 'Página inválida.' },
+      { status: 400 }
+    );
+  }
+  const pagina = parsedPage;
 
   try {
     const store = await createRequestTokenStore();

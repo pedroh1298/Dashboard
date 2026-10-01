@@ -2,9 +2,10 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 export const AUTH_COOKIE_NAME = 'dashboard_session';
-export const AUTH_SESSION_TTL_SECONDS = 24 * 60 * 60;
+export const AUTH_SESSION_TTL_SECONDS = 8 * 60 * 60;
 
 const encoder = new TextEncoder();
+const AUTH_SESSION_VERSION = 'admin-v2';
 
 function getSessionSecret(): string {
   const secret = process.env.AUTH_SESSION_SECRET
@@ -52,8 +53,20 @@ function constantTimeEqual(left: string, right: string): boolean {
 
 export async function createAuthSessionValue(): Promise<string> {
   const expiresAt = Math.floor(Date.now() / 1000) + AUTH_SESSION_TTL_SECONDS;
-  const payload = `admin.${expiresAt}`;
+  const payload = `${AUTH_SESSION_VERSION}.${expiresAt}`;
   return `${payload}.${await sign(payload)}`;
+}
+
+export function authCookieOptions(maxAge = AUTH_SESSION_TTL_SECONDS) {
+  return {
+    path: '/',
+    maxAge,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    // Lax preserva o retorno do OAuth do Bling em navegação de nível superior.
+    sameSite: 'lax' as const,
+    priority: 'high' as const,
+  };
 }
 
 export async function verifyAuthSessionValue(value?: string): Promise<boolean> {
@@ -64,7 +77,7 @@ export async function verifyAuthSessionValue(value?: string): Promise<boolean> {
 
   const [owner, expiresRaw, receivedSignature] = parts;
   const expiresAt = Number(expiresRaw);
-  if (owner !== 'admin' || !Number.isFinite(expiresAt) || expiresAt <= Date.now() / 1000) {
+  if (owner !== AUTH_SESSION_VERSION || !Number.isFinite(expiresAt) || expiresAt <= Date.now() / 1000) {
     return false;
   }
 
@@ -89,6 +102,17 @@ export async function hasAuthCookie(cookieHeader: string | null): Promise<boolea
 export async function isSessionAuthenticated(): Promise<boolean> {
   const jar = await cookies();
   return verifyAuthSessionValue(jar.get(AUTH_COOKIE_NAME)?.value);
+}
+
+export function isSameOriginRequest(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return false;
+
+  try {
+    return new URL(origin).origin === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
 }
 
 export function unauthorizedJson() {

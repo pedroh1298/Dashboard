@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { isSessionAuthenticated, unauthorizedJson } from '@/lib/auth';
+import { isSameOriginRequest, isSessionAuthenticated, unauthorizedJson } from '@/lib/auth';
 import { BlingClient } from '@/services/bling/blingClient';
 import { BlingService } from '@/services/bling/blingService';
 import { areBlingCredentialsConfigured, getBlingRedirectUri, parseScopeList } from '@/services/bling/config';
@@ -65,9 +65,12 @@ export async function GET() {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
   if (!(await isSessionAuthenticated())) {
     return unauthorizedJson();
+  }
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ success: false, error: 'Origem inválida.' }, { status: 403 });
   }
 
   const store = await createRequestTokenStore();
@@ -80,10 +83,14 @@ export async function POST(request: Request) {
   if (!(await isSessionAuthenticated())) {
     return unauthorizedJson();
   }
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ success: false, error: 'Origem inválida.' }, { status: 403 });
+  }
 
   try {
     const body = await request.json();
-    if (!body.code) {
+    const codeInput = typeof body?.code === 'string' ? body.code.trim() : '';
+    if (!codeInput || codeInput.length > 4096) {
       return NextResponse.json({
         success: false,
         error: 'Informe o código de autorização retornado pelo Bling.',
@@ -92,7 +99,7 @@ export async function POST(request: Request) {
 
     const store = await createRequestTokenStore();
     const manager = new BlingTokenManager(store);
-    await manager.exchangeCodeForTokens(extractAuthorizationCode(String(body.code)));
+    await manager.exchangeCodeForTokens(extractAuthorizationCode(codeInput));
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     const message = error instanceof BlingApiError

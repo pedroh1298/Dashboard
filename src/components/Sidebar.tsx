@@ -80,13 +80,15 @@ function SidebarContent({ onClose }: { onClose?: () => void }) {
           <Settings className="h-[18px] w-[18px]" strokeWidth={1.8} />
           Configurações
         </Link>
-        <a
-          href="/api/auth/logout"
-          className="flex items-center gap-3 rounded-[4px] px-3 py-2.5 text-sm text-[#c7aaa3] hover:bg-white/[0.06] hover:text-[#f1c1b5]"
-        >
-          <LogOut className="h-[18px] w-[18px]" strokeWidth={1.8} />
-          Sair
-        </a>
+        <form action="/api/auth/logout" method="post">
+          <button
+            type="submit"
+            className="flex w-full items-center gap-3 rounded-[4px] px-3 py-2.5 text-sm text-[#c7aaa3] hover:bg-white/[0.06] hover:text-[#f1c1b5]"
+          >
+            <LogOut className="h-[18px] w-[18px]" strokeWidth={1.8} />
+            Sair
+          </button>
+        </form>
       </div>
     </div>
   );

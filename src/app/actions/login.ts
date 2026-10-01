@@ -1,16 +1,19 @@
 "use server"
 
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import {
   AUTH_COOKIE_NAME,
-  AUTH_SESSION_TTL_SECONDS,
+  authCookieOptions,
   createAuthSessionValue,
 } from '@/lib/auth'
+import {
+  checkLoginRateLimit,
+  clearFailedLogins,
+  loginClientKey,
+  recordFailedLogin,
+} from '@/lib/loginRateLimit'
 
-const FALLBACK_USERNAME = 'ADMIN'
-const FALLBACK_PASSWORD_SALT = 'D3T_KIz7bnsd_NiotWLZNQ'
-const FALLBACK_PASSWORD_HASH = 'sSFcf8TBM7oyR8yPPdWBte8xrOssx-nGkerq-wzRFok'
-const FALLBACK_PASSWORD_ITERATIONS = 210_000
+const ADMIN_USERNAME = 'ADMIN'
 
 function fromBase64Url(value: string): Uint8Array<ArrayBuffer> {
   const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
@@ -32,12 +35,24 @@ function constantTimeEqual(left: Uint8Array, right: Uint8Array): boolean {
   return difference === 0
 }
 
-async function verifyFallbackCredentials(username: string, password: string): Promise<boolean> {
-  if (username !== FALLBACK_USERNAME || !password) return false
+async function verifyAdminCredentials(username: string, password: string): Promise<boolean> {
+  const salt = process.env.DASHBOARD_PASSWORD_SALT?.trim()
+  const expectedHash = process.env.DASHBOARD_PASSWORD_HASH?.trim()
+  const iterations = Number(process.env.DASHBOARD_PASSWORD_ITERATIONS || 600_000)
+  if (
+    !salt
+    || !expectedHash
+    || !Number.isInteger(iterations)
+    || iterations < 600_000
+  ) {
+    console.error('[Auth] Verificador da senha ADMIN não configurado no servidor.')
+    return false
+  }
 
+  const boundedPassword = password.slice(0, 256)
   const key = await crypto.subtle.importKey(
     'raw',
-    new TextEncoder().encode(password),
+    new TextEncoder().encode(boundedPassword),
     'PBKDF2',
     false,
     ['deriveBits']
@@ -46,39 +61,46 @@ async function verifyFallbackCredentials(username: string, password: string): Pr
     {
       name: 'PBKDF2',
       hash: 'SHA-256',
-      salt: fromBase64Url(FALLBACK_PASSWORD_SALT),
-      iterations: FALLBACK_PASSWORD_ITERATIONS,
+      salt: fromBase64Url(salt),
+      iterations,
     },
     key,
     256
   )
 
-  return constantTimeEqual(
-    new Uint8Array(derived),
-    fromBase64Url(FALLBACK_PASSWORD_HASH)
-  )
+  return username === ADMIN_USERNAME
+    && password.length > 0
+    && password.length <= 256
+    && constantTimeEqual(new Uint8Array(derived), fromBase64Url(expectedHash))
 }
 
 export async function loginAction(formData: FormData) {
-  const username = String(formData.get('username') || '')
+  const username = String(formData.get('username') || '').trim().slice(0, 64)
   const password = String(formData.get('password') || '')
-  const expectedUsername = process.env.DASHBOARD_USERNAME
-  const expectedPassword = process.env.DASHBOARD_PASSWORD
+  const requestHeaders = await headers()
+  const clientKey = loginClientKey(requestHeaders)
+  const rateLimit = checkLoginRateLimit(clientKey)
 
-  const validCredentials = expectedUsername && expectedPassword
-    ? username === expectedUsername && password === expectedPassword
-    : await verifyFallbackCredentials(username, password)
+  if (!rateLimit.allowed) {
+    return {
+      success: false,
+      error: `Muitas tentativas. Aguarde ${Math.ceil(rateLimit.retryAfterSeconds / 60)} minuto(s).`,
+    }
+  }
+
+  const validCredentials = await verifyAdminCredentials(username, password)
 
   if (validCredentials) {
-    (await cookies()).set(AUTH_COOKIE_NAME, await createAuthSessionValue(), {
-      path: '/',
-      maxAge: AUTH_SESSION_TTL_SECONDS,
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-    })
+    clearFailedLogins(clientKey)
+    const cookieJar = await cookies()
+    cookieJar.set(
+      AUTH_COOKIE_NAME,
+      await createAuthSessionValue(),
+      authCookieOptions()
+    )
     return { success: true }
   }
 
+  recordFailedLogin(clientKey)
   return { success: false, error: 'Usuário ou senha incorretos' }
 }

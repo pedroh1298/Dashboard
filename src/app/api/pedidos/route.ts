@@ -13,8 +13,25 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const dataInicial = searchParams.get('dataInicial') || undefined;
   const dataFinal = searchParams.get('dataFinal') || undefined;
-  const pagina = searchParams.get('pagina') ? Number(searchParams.get('pagina')) : undefined;
-  const idSituacao = searchParams.get('idSituacao') ? Number(searchParams.get('idSituacao')) : undefined;
+  const pageParam = searchParams.get('pagina');
+  const statusParam = searchParams.get('idSituacao');
+  const pagina = pageParam ? Number(pageParam) : undefined;
+  const idSituacao = statusParam ? Number(statusParam) : undefined;
+  const validDate = (value?: string) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+  const validPositiveInteger = (value?: number) => value === undefined
+    || (Number.isInteger(value) && value > 0);
+
+  if (
+    !validDate(dataInicial)
+    || !validDate(dataFinal)
+    || !validPositiveInteger(pagina)
+    || !validPositiveInteger(idSituacao)
+  ) {
+    return NextResponse.json(
+      { success: false, error: 'Parâmetros de consulta inválidos.' },
+      { status: 400 }
+    );
+  }
 
   try {
     const store = await createRequestTokenStore();
