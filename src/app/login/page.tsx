@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Lock, User } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Lock, User } from 'lucide-react';
 import { loginAction } from '../actions/login';
 
 export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -78,12 +79,24 @@ export default function Login() {
                 <Lock className="h-[18px] w-[18px] text-[#8b8f88]" strokeWidth={1.8} />
               </div>
               <input
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 name="password"
                 required
-                className="field w-full py-3 pl-11 pr-4 text-sm outline-none placeholder:text-[#a8aaa5]"
+                className="field w-full py-3 pl-11 pr-12 text-sm outline-none placeholder:text-[#a8aaa5]"
                 placeholder="••••••••"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((visible) => !visible)}
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-[#8b8f88] hover:text-[#41443f]"
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                aria-pressed={showPassword}
+                title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+              >
+                {showPassword
+                  ? <EyeOff className="h-[18px] w-[18px]" strokeWidth={1.8} />
+                  : <Eye className="h-[18px] w-[18px]" strokeWidth={1.8} />}
+              </button>
             </div>
           </div>
 
