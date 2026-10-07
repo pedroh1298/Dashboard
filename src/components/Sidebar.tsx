@@ -10,6 +10,7 @@ import {
   Settings,
   LogOut,
   Radar,
+  WandSparkles,
   Menu,
   X,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ const navItems = [
   { href: '/', label: 'Visão geral', icon: LayoutDashboard },
   { href: '/produtos', label: 'Produtos', icon: Package },
   { href: '/pedidos', label: 'Pedidos', icon: ShoppingCart },
+  { href: '/gerador', label: 'Gerador IA', icon: WandSparkles },
   { href: '/oportunidades', label: 'Mercado', icon: Radar },
 ];
 

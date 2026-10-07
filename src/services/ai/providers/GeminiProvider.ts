@@ -1,9 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AIProvider } from './AIProvider';
-import { ProductAnalysisRequest, ProductAnalysisResponse, MarketReportRequest, MarketReportResponse, ListingGenerationRequest, SalesAnalysisRequest, SalesAnalysisResponse, ChatRequest, ChatResponse } from '../types';
+import { ProductAnalysisRequest, ProductAnalysisResponse, MarketReportRequest, MarketReportResponse, ListingGenerationRequest, CompleteListingRequest, CompleteListingResponse, SalesAnalysisRequest, SalesAnalysisResponse, ChatRequest, ChatResponse } from '../types';
 import { AIError } from '../errors/AIError';
 import { buildAnalyzeProductPrompt } from '../prompts/analyzeProduct';
-import { buildGenerateListingTitlePrompt, buildGenerateListingDescriptionPrompt } from '../prompts/generateListing';
+import { buildGenerateListingTitlePrompt, buildGenerateListingDescriptionPrompt, buildCompleteListingPrompt } from '../prompts/generateListing';
 import { buildAnalyzeSalesPrompt } from '../prompts/analyzeSales';
 import { buildChatPrompt } from '../prompts/chat';
 
@@ -104,6 +104,31 @@ Cada array deve ter entre 3 e 6 itens. Cada item deve ser uma frase completa em 
       return (await result.response).text().trim();
     } catch (error) {
       this.handleError(error, 'generateListingDescription');
+    }
+  }
+
+  async generateCompleteListing(request: CompleteListingRequest): Promise<CompleteListingResponse> {
+    try {
+      const model = this.ai.getGenerativeModel({
+        model: this.defaultModel,
+        generationConfig: { responseMimeType: 'application/json' },
+      });
+      const prompt = buildCompleteListingPrompt(request);
+      const content: Array<string | { inlineData: { data: string; mimeType: string } }> = [prompt];
+
+      if (request.imageBuffer && request.mimeType) {
+        content.push({ inlineData: { data: request.imageBuffer, mimeType: request.mimeType } });
+      }
+
+      const result = await model.generateContent(content);
+      const rawText = (await result.response).text();
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('A IA não retornou um anúncio válido.');
+      }
+      return JSON.parse(jsonMatch[0]) as CompleteListingResponse;
+    } catch (error) {
+      this.handleError(error, 'generateCompleteListing');
     }
   }
 
