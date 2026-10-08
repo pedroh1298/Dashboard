@@ -6,6 +6,7 @@ interface SalesPoint {
   name: string;
   ML: number;
   Amazon: number;
+  Outros?: number;
 }
 
 export default function SalesChart({ data }: { data: SalesPoint[] }) {
@@ -22,6 +23,10 @@ export default function SalesChart({ data }: { data: SalesPoint[] }) {
               <stop offset="5%" stopColor="#bd6a24" stopOpacity={0.16} />
               <stop offset="95%" stopColor="#bd6a24" stopOpacity={0} />
             </linearGradient>
+            <linearGradient id="colorUnknown" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#737971" stopOpacity={0.14} />
+              <stop offset="95%" stopColor="#737971" stopOpacity={0} />
+            </linearGradient>
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#303630" vertical={false} />
           <XAxis dataKey="name" stroke="#8f978f" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} dy={10} />
@@ -32,6 +37,7 @@ export default function SalesChart({ data }: { data: SalesPoint[] }) {
           />
           <Area type="monotone" dataKey="ML" stroke="#176b57" strokeWidth={2} fillOpacity={1} fill="url(#colorML)" />
           <Area type="monotone" dataKey="Amazon" stroke="#bd6a24" strokeWidth={2} fillOpacity={1} fill="url(#colorAmz)" />
+          <Area type="monotone" dataKey="Outros" name="Não identificado" stroke="#737971" strokeWidth={2} fillOpacity={1} fill="url(#colorUnknown)" />
         </AreaChart>
       </ResponsiveContainer>
     </div>

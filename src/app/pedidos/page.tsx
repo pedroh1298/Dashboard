@@ -54,7 +54,7 @@ interface BlingOrder {
 
 type OperationFilter = 'full' | 'matriz' | 'nao_identificado';
 type ShippingMethod = 'full' | 'flex' | 'mercado_envios' | 'correios' | 'outro' | 'nao_identificado';
-type MarketplaceFilter = 'mercado_livre' | 'amazon';
+type MarketplaceFilter = 'mercado_livre' | 'amazon' | 'nao_identificado';
 
 const SITUACOES: Record<number, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   6:  { label: 'Em aberto',    color: 'text-[#8a5a12]', bg: 'bg-[#f5ead6] border-[#dfc99e]', icon: <Clock className="w-3.5 h-3.5" /> },
@@ -81,6 +81,7 @@ const MARKETPLACE_OPTIONS: Array<{ value: MarketplaceFilter | 'todos'; label: st
   { value: 'todos', label: 'Todas' },
   { value: 'mercado_livre', label: 'Mercado Livre' },
   { value: 'amazon', label: 'Amazon' },
+  { value: 'nao_identificado', label: 'Não identificado' },
 ];
 
 function getSituacaoStyle(id?: number) {
@@ -112,14 +113,14 @@ function marketplaceKey(value?: string): MarketplaceFilter {
   const normalized = (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (normalized.includes('mercado livre') || normalized.includes('mercadolivre')) return 'mercado_livre';
   if (normalized.includes('amazon')) return 'amazon';
-  return 'mercado_livre';
+  return 'nao_identificado';
 }
 
 function getMarketplaceStyle(marketplace?: string) {
   const key = marketplaceKey(marketplace);
   if (key === 'mercado_livre') return { label: 'MERCADO LIVRE', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
   if (key === 'amazon') return { label: 'AMAZON', className: 'border-[#66502a] bg-[#3a2c19] text-[#dca45e]' };
-  return { label: 'MERCADO LIVRE', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
+  return { label: 'NÃO IDENTIFICADO', className: 'border-[#5b4641] bg-[#2c211f] text-[#d39a8e]' };
 }
 
 function getShippingStyle(method?: ShippingMethod, detailsLoaded?: boolean) {

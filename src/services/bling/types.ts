@@ -44,6 +44,7 @@ export interface BlingOrder {
   total: number;
   observacoes?: string;
   observacoesInternas?: string;
+  numeroPedidoCompra?: string;
   contato?: BlingOrderContact;
   situacao?: BlingOrderSituation;
   loja?: {
@@ -53,6 +54,11 @@ export interface BlingOrder {
     };
   };
   itens?: BlingOrderItem[];
+  parcelas?: Array<{
+    id?: number;
+    observacoes?: string;
+    caut?: string;
+  }>;
   transporte?: {
     servico?: string;
     modalidade?: string;
@@ -182,5 +188,10 @@ export interface DashboardData {
   metrics: DashboardMetrics;
   salesData: DashboardSalesPoint[];
   recentOrders?: BlingOrder[];
+  marketplaceSummary?: {
+    mercadoLivre: number;
+    amazon: number;
+    naoIdentificado: number;
+  };
   message?: string;
 }

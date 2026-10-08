@@ -356,6 +356,7 @@ export default function Dashboard() {
                 <div className="flex flex-wrap items-center gap-y-2">
                   <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#176b57]"></span><span className="text-xs text-[#6f736d]">Mercado Livre</span></div>
                   <div className="ml-3 flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#bd6a24]"></span><span className="text-xs text-[#6f736d]">Amazon</span></div>
+                  <div className="ml-3 flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#737971]"></span><span className="text-xs text-[#6f736d]">Não identificado</span></div>
                 </div>
               </div>
               
