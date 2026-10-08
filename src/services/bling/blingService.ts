@@ -79,8 +79,8 @@ function marketplaceFromOrder(order: BlingOrder): MarketplaceName | undefined {
 }
 
 function marketplaceLabel(type?: string, storeName?: string, externalOrderNumber?: string, inferred?: MarketplaceName): MarketplaceLabel {
-  return marketplaceFromText(type, storeName)
-    || inferred
+  return inferred
+    || marketplaceFromText(type, storeName)
     || inferMarketplaceFromOrderNumber(externalOrderNumber)
     || 'Não identificado';
 }
