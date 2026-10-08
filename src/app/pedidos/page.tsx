@@ -19,6 +19,9 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Store,
+  Warehouse,
+  Truck,
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 
@@ -28,11 +31,25 @@ interface BlingOrder {
   numeroLoja?: string;
   data: string;
   dataSaida?: string;
+  dataPrevista?: string;
   total: number;
   contato?: { id?: number; nome?: string; tipoPessoa?: string };
   situacao?: { id: number; valor?: string };
+  loja?: { id?: number; unidadeNegocio?: { id?: number } };
   itens?: { id?: number; codigo?: string; descricao?: string; quantidade?: number; valor?: number }[];
+  operacao?: {
+    channelId?: number;
+    storeName: string;
+    marketplace: string;
+    businessUnitId?: number;
+    businessUnitName: string;
+    warehouseId?: number;
+    warehouseName: string;
+    fulfillment: OperationFilter;
+  };
 }
+
+type OperationFilter = 'full' | 'matriz' | 'nao_identificado';
 
 const SITUACOES: Record<number, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   6:  { label: 'Em aberto',    color: 'text-[#8a5a12]', bg: 'bg-[#f5ead6] border-[#dfc99e]', icon: <Clock className="w-3.5 h-3.5" /> },
@@ -47,6 +64,13 @@ const PERIOD_OPTIONS = [
   { label: '30 dias', days: 30 },
   { label: '60 dias', days: 60 },
   { label: '90 dias', days: 90 },
+];
+
+const OPERATION_OPTIONS: Array<{ value: OperationFilter | 'todos'; label: string }> = [
+  { value: 'todos', label: 'Todas' },
+  { value: 'matriz', label: 'Matriz' },
+  { value: 'full', label: 'Full' },
+  { value: 'nao_identificado', label: 'Não identificado' },
 ];
 
 function getSituacaoStyle(id?: number) {
@@ -64,6 +88,16 @@ function formatDate(dateStr: string) {
   return `${day}/${month}/${year}`;
 }
 
+function getOperationStyle(operation?: OperationFilter) {
+  if (operation === 'full') {
+    return { label: 'FULL', className: 'border-[#355966] bg-[#1b3038] text-[#77afc2]' };
+  }
+  if (operation === 'matriz') {
+    return { label: 'MATRIZ', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
+  }
+  return { label: 'NÃO IDENTIFICADO', className: 'border-[#66502a] bg-[#3a2c19] text-[#dca45e]' };
+}
+
 const PAGE_SIZE = 15;
 
 export default function PedidosPage() {
@@ -75,6 +109,7 @@ export default function PedidosPage() {
   const [search, setSearch] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState(30);
   const [selectedSituacao, setSelectedSituacao] = useState<number | null>(null);
+  const [selectedOperation, setSelectedOperation] = useState<OperationFilter | 'todos'>('todos');
   const [currentPage, setCurrentPage] = useState(1);
   const [connectedBling, setConnectedBling] = useState(true);
 
@@ -122,7 +157,10 @@ export default function PedidosPage() {
       result = result.filter(o =>
         o.numero.toString().includes(q) ||
         o.contato?.nome?.toLowerCase().includes(q) ||
-        o.numeroLoja?.toLowerCase().includes(q)
+        o.numeroLoja?.toLowerCase().includes(q) ||
+        o.operacao?.storeName.toLowerCase().includes(q) ||
+        o.operacao?.marketplace.toLowerCase().includes(q) ||
+        o.operacao?.warehouseName.toLowerCase().includes(q)
       );
     }
 
@@ -130,15 +168,21 @@ export default function PedidosPage() {
       result = result.filter(o => o.situacao?.id === selectedSituacao);
     }
 
+    if (selectedOperation !== 'todos') {
+      result = result.filter(o => o.operacao?.fulfillment === selectedOperation);
+    }
+
     setFilteredOrders(result);
     setCurrentPage(1);
-  }, [orders, search, selectedSituacao]);
+  }, [orders, search, selectedSituacao, selectedOperation]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const totalFaturamento = filteredOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
-  const ticketMedio = filteredOrders.length > 0 ? totalFaturamento / filteredOrders.length : 0;
+  const openOrders = filteredOrders.filter(order => order.situacao?.id === 6);
+  const openMatriz = openOrders.filter(order => order.operacao?.fulfillment === 'matriz').length;
+  const openFull = openOrders.filter(order => order.operacao?.fulfillment === 'full').length;
 
   const handlePeriodChange = (days: number) => {
     setSelectedPeriod(days);
@@ -181,7 +225,7 @@ export default function PedidosPage() {
           <div>
             <p className="page-kicker mb-3">Vendas</p>
             <h2 className="page-title">Pedidos</h2>
-            <p className="page-description mt-2">Acompanhe o volume, o faturamento e o andamento dos pedidos registrados no Bling.</p>
+            <p className="page-description mt-2">Acompanhe cada pedido pela loja, marketplace e depósito vinculados no Bling.</p>
           </div>
 
           {/* Loading state */}
@@ -227,6 +271,24 @@ export default function PedidosPage() {
                   ))}
                 </div>
 
+                {/* Operação */}
+                <div className="surface flex flex-wrap items-center gap-1 p-1">
+                  <Warehouse className="ml-2 h-4 w-4 text-gray-500" />
+                  {OPERATION_OPTIONS.map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setSelectedOperation(option.value)}
+                      className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
+                        selectedOperation === option.value
+                          ? 'bg-[#26322c] text-white'
+                          : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Situação */}
                 <div className="surface flex flex-wrap items-center gap-1 p-1">
                   <Filter className="w-4 h-4 text-gray-500 ml-2" />
@@ -258,7 +320,7 @@ export default function PedidosPage() {
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="Buscar por número, cliente..."
+                    placeholder="Buscar pedido, cliente, loja ou depósito..."
                     className="w-full border-none bg-transparent text-sm outline-none placeholder:text-[#9a9d97]"
                   />
                 </div>
@@ -277,20 +339,14 @@ export default function PedidosPage() {
                   <p className="mt-1 text-xs text-[#858981]">período filtrado</p>
                 </div>
                 <div className="metric-cell">
-                  <p className="mb-1 text-xs text-[#737770]">Ticket médio</p>
-                  <p className="data-number text-xl font-semibold">{formatCurrency(ticketMedio)}</p>
-                  <p className="mt-1 text-xs text-[#858981]">por pedido</p>
+                  <p className="mb-1 text-xs text-[#737770]">Em aberto · Matriz</p>
+                  <p className="data-number text-2xl font-semibold text-[#66b89d]">{openMatriz}</p>
+                  <p className="mt-1 text-xs text-[#858981]">separação própria</p>
                 </div>
                 <div className="metric-cell">
-                  <p className="mb-1 text-xs text-[#737770]">Atendidos</p>
-                  <p className="data-number text-2xl font-semibold text-[#176b57]">
-                    {filteredOrders.filter(o => o.situacao?.id === 9).length}
-                  </p>
-                  <p className="mt-1 text-xs text-[#858981]">
-                    {filteredOrders.length > 0
-                      ? `${((filteredOrders.filter(o => o.situacao?.id === 9).length / filteredOrders.length) * 100).toFixed(0)}% do total`
-                      : '-'}
-                  </p>
+                  <p className="mb-1 text-xs text-[#737770]">Em aberto · Full</p>
+                  <p className="data-number text-2xl font-semibold text-[#77afc2]">{openFull}</p>
+                  <p className="mt-1 text-xs text-[#858981]">logística Mercado Livre</p>
                 </div>
               </div>
 
@@ -312,11 +368,11 @@ export default function PedidosPage() {
                 ) : (
                   <>
                     {/* Header da tabela */}
-                    <div className="hidden grid-cols-[60px_100px_1fr_140px_120px_100px_60px] gap-4 border-b border-[#dedfd8] bg-[#f4f4ef] px-6 py-3 text-[11px] font-semibold text-[#737770] md:grid">
-                      <span>#</span>
-                      <span>Número</span>
+                    <div className="hidden grid-cols-[90px_minmax(180px,1.1fr)_minmax(230px,1.5fr)_150px_125px_100px_44px] gap-4 border-b border-[#dedfd8] bg-[#f4f4ef] px-6 py-3 text-[11px] font-semibold text-[#737770] lg:grid">
+                      <span>Pedido</span>
                       <span>Cliente</span>
-                      <span>Data</span>
+                      <span>Loja e depósito</span>
+                      <span>Venda / entrega</span>
                       <span>Status</span>
                       <span className="text-right">Total</span>
                       <span></span>
@@ -325,22 +381,19 @@ export default function PedidosPage() {
                     <div className="divide-y divide-[#e3e4dd]">
                       {paginatedOrders.map((order, i) => {
                         const sit = getSituacaoStyle(order.situacao?.id);
+                        const operationStyle = getOperationStyle(order.operacao?.fulfillment);
                         return (
                           <div
                             key={order.id}
-                            className="data-table-row grid grid-cols-1 items-center gap-2 px-6 py-4 md:grid-cols-[60px_100px_1fr_140px_120px_100px_60px] md:gap-4"
+                            className="data-table-row grid grid-cols-1 items-start gap-4 px-5 py-5 lg:grid-cols-[90px_minmax(180px,1.1fr)_minmax(230px,1.5fr)_150px_125px_100px_44px] lg:items-center lg:gap-4 lg:px-6 lg:py-4"
                           >
-                            {/* Index */}
-                            <span className="hidden md:block text-xs text-gray-600 font-mono">
-                              {(currentPage - 1) * PAGE_SIZE + i + 1}
-                            </span>
-
                             {/* Número */}
                             <div>
                               <span className="font-mono text-sm font-semibold text-[#176b57]">#{order.numero}</span>
                               {order.numeroLoja && (
-                                <p className="text-xs text-gray-600 mt-0.5">{order.numeroLoja}</p>
+                                <p className="mt-1 truncate text-[11px] text-gray-600" title={order.numeroLoja}>{order.numeroLoja}</p>
                               )}
+                              <p className="mt-1 text-[10px] text-[#667069] lg:hidden">Item {(currentPage - 1) * PAGE_SIZE + i + 1}</p>
                             </div>
 
                             {/* Cliente */}
@@ -356,10 +409,38 @@ export default function PedidosPage() {
                               )}
                             </div>
 
-                            {/* Data */}
-                            <div className="flex items-center gap-2 text-sm text-gray-400">
-                              <Calendar className="w-3.5 h-3.5 shrink-0 text-gray-600 hidden md:block" />
-                              {formatDate(order.data)}
+                            {/* Loja, marketplace e depósito */}
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex rounded-[4px] border px-2 py-0.5 text-[10px] font-bold ${operationStyle.className}`}>
+                                  {operationStyle.label}
+                                </span>
+                                <span className="truncate text-sm font-medium" title={order.operacao?.storeName}>
+                                  {order.operacao?.storeName || 'Loja não identificada'}
+                                </span>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#858981]">
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                  <Store className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{order.operacao?.marketplace || 'Marketplace não identificado'}</span>
+                                </span>
+                                <span className="flex min-w-0 items-center gap-1.5">
+                                  <Warehouse className="h-3.5 w-3.5 shrink-0" />
+                                  <span className="truncate">{order.operacao?.warehouseName || 'Depósito não identificado'}</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Datas */}
+                            <div className="space-y-1.5 text-xs">
+                              <div className="flex items-center gap-2 text-[#a1a8a0]">
+                                <Calendar className="h-3.5 w-3.5 shrink-0 text-[#737d75]" />
+                                <span><span className="text-[#737d75]">Venda</span> {formatDate(order.data)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-[#a1a8a0]">
+                                <Truck className="h-3.5 w-3.5 shrink-0 text-[#737d75]" />
+                                <span><span className="text-[#737d75]">Entrega</span> {formatDate(order.dataPrevista || order.dataSaida || '')}</span>
+                              </div>
                             </div>
 
                             {/* Status */}

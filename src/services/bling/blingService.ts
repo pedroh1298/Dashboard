@@ -2,9 +2,14 @@ import { BlingClient } from './blingClient';
 import { BlingApiError } from './errors';
 import {
   BlingOrder,
+  BlingOrderOperation,
   BlingOrdersResponse,
   BlingProduct,
   BlingProductsResponse,
+  BlingSalesChannel,
+  BlingSalesChannelResponse,
+  BlingWarehouse,
+  BlingWarehousesResponse,
   DashboardData,
   DashboardMetrics,
   DashboardSalesPoint,
@@ -12,6 +17,31 @@ import {
 
 const MAX_ORDER_PAGES = 5;
 const MAX_PRODUCT_PAGES = 100;
+const OPERATION_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let warehouseCache: { expiresAt: number; data: BlingWarehouse[] } | null = null;
+const channelCache = new Map<number, { expiresAt: number; data: BlingSalesChannel }>();
+
+function normalizeLabel(value?: string): string {
+  return (value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function marketplaceLabel(type?: string, storeName?: string): string {
+  const normalized = normalizeLabel(`${type || ''} ${storeName || ''}`).replace(/\W/g, '');
+  if (normalized.includes('mercadolivre')) return 'Mercado Livre';
+  if (normalized.includes('amazon')) return 'Amazon';
+  return type?.trim() || 'Não identificado';
+}
+
+function classifyOperation(storeName: string, marketplace: string, warehouseName: string, businessUnitName: string): BlingOrderOperation['fulfillment'] {
+  const operationText = normalizeLabel(`${storeName} ${marketplace} ${warehouseName} ${businessUnitName}`);
+  if (/(^|\W)full($|\W)/.test(operationText)) return 'full';
+  if (operationText.includes('mercado livre') || operationText.includes('matriz')) return 'matriz';
+  return 'nao_identificado';
+}
 
 export class BlingService {
   constructor(private readonly client: BlingClient) {}
@@ -47,6 +77,80 @@ export class BlingService {
       if (page.length < (params?.limite || 100)) break;
     }
     return orders;
+  }
+
+  private async getWarehouses(): Promise<BlingWarehouse[]> {
+    const now = Date.now();
+    if (warehouseCache && warehouseCache.expiresAt > now) return warehouseCache.data;
+
+    const result = await this.client.get<BlingWarehousesResponse>('/depositos?limite=100');
+    const data = result.data || [];
+    warehouseCache = { data, expiresAt: now + OPERATION_CACHE_TTL_MS };
+    return data;
+  }
+
+  private async getSalesChannel(id: number): Promise<BlingSalesChannel> {
+    const now = Date.now();
+    const cached = channelCache.get(id);
+    if (cached && cached.expiresAt > now) return cached.data;
+
+    const result = await this.client.get<BlingSalesChannelResponse>(`/canais-venda/${id}`);
+    channelCache.set(id, { data: result.data, expiresAt: now + OPERATION_CACHE_TTL_MS });
+    return result.data;
+  }
+
+  async enrichOrdersWithOperation(orders: BlingOrder[]): Promise<BlingOrder[]> {
+    const channelIds = [...new Set(
+      orders
+        .map(order => order.loja?.id)
+        .filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0)
+    )];
+
+    if (channelIds.length === 0) return orders;
+
+    const warehouses = await this.getWarehouses().catch((error) => {
+      console.warn('[BlingService] Não foi possível listar depósitos:', error instanceof Error ? error.message : 'unknown');
+      return [] as BlingWarehouse[];
+    });
+    const warehousesById = new Map(warehouses.map(warehouse => [warehouse.id, warehouse]));
+    const channelsById = new Map<number, BlingSalesChannel>();
+
+    for (const channelId of channelIds) {
+      try {
+        channelsById.set(channelId, await this.getSalesChannel(channelId));
+      } catch (error) {
+        console.warn(`[BlingService] Não foi possível consultar o canal ${channelId}:`, error instanceof Error ? error.message : 'unknown');
+      }
+    }
+
+    return orders.map((order) => {
+      const channelId = order.loja?.id;
+      const businessUnitId = order.loja?.unidadeNegocio?.id;
+      const channel = channelId ? channelsById.get(channelId) : undefined;
+      const branch = channel?.filiais?.find(item => item.idUnidadeNegocio === businessUnitId)
+        || channel?.filiais?.find(item => item.padrao)
+        || channel?.filiais?.[0];
+      const warehouseId = branch?.deposito?.id;
+      const warehouse = warehouseId ? warehousesById.get(warehouseId) : undefined;
+      const storeName = channel?.descricao?.trim() || (channelId ? `Loja ${channelId}` : 'Não identificada');
+      const marketplace = marketplaceLabel(channel?.tipo, storeName);
+      const businessUnitName = branch?.unidadeNegocio?.trim() || 'Não identificada';
+      const warehouseName = warehouse?.descricao?.trim() || (warehouseId ? `Depósito ${warehouseId}` : 'Não identificado');
+
+      return {
+        ...order,
+        operacao: {
+          channelId,
+          storeName,
+          marketplace,
+          businessUnitId: businessUnitId || branch?.idUnidadeNegocio,
+          businessUnitName,
+          warehouseId,
+          warehouseName,
+          fulfillment: classifyOperation(storeName, marketplace, warehouseName, businessUnitName),
+        },
+      };
+    });
   }
 
   async getProducts(params?: {
@@ -108,11 +212,12 @@ export class BlingService {
       sixtyDaysAgo.setDate(now.getDate() - 60);
       const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
-      const currentOrders = await this.getAllOrders({
+      const currentOrderList = await this.getAllOrders({
         dataInicial: formatDate(thirtyDaysAgo),
         dataFinal: formatDate(now),
         limite: 100,
       });
+      const currentOrders = await this.enrichOrdersWithOperation(currentOrderList);
 
       const previousOrders = await this.getAllOrders({
         dataInicial: formatDate(sixtyDaysAgo),
@@ -162,14 +267,13 @@ export class BlingService {
         if (salesMap.has(orderDate)) {
           const entry = salesMap.get(orderDate)!;
           const val = Number(order.total) || 0;
-          const numLoja = (order.numeroLoja || '').toLowerCase();
-          if (numLoja.includes('ml') || numLoja.includes('mercado') || (order.loja?.id && order.loja.id % 2 === 0)) {
+          const marketplace = normalizeLabel(order.operacao?.marketplace);
+          if (marketplace.includes('mercado livre')) {
             entry.ML += val;
-          } else if (numLoja.includes('amz') || numLoja.includes('amazon')) {
+          } else if (marketplace.includes('amazon')) {
             entry.Amazon += val;
           } else {
-            entry.ML += val * 0.65;
-            entry.Amazon += val * 0.35;
+            entry.Outros += val;
           }
         }
       });
@@ -181,6 +285,7 @@ export class BlingService {
           name: `${day}/${month}`,
           ML: Math.round(entry.ML),
           Amazon: Math.round(entry.Amazon),
+          Outros: Math.round(entry.Outros),
           Total: Math.round(entry.ML + entry.Amazon + entry.Outros),
         };
       });

@@ -35,14 +35,12 @@ export async function GET(request: Request) {
 
   try {
     const store = await createRequestTokenStore();
-    const orders = await new BlingService(new BlingClient(store)).getOrders({
-      dataInicial,
-      dataFinal,
-      pagina,
-      idSituacao,
-      limite: 100,
-    });
-    return NextResponse.json({ success: true, orders });
+    const service = new BlingService(new BlingClient(store));
+    const orders = pagina
+      ? await service.getOrders({ dataInicial, dataFinal, pagina, idSituacao, limite: 100 })
+      : await service.getAllOrders({ dataInicial, dataFinal, idSituacao, limite: 100 });
+    const enrichedOrders = await service.enrichOrdersWithOperation(orders);
+    return NextResponse.json({ success: true, orders: enrichedOrders });
   } catch (error: unknown) {
     const message = error instanceof BlingApiError ? error.userMessage : 'Erro ao buscar pedidos';
     console.error('[API Pedidos] Erro');
