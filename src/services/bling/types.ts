@@ -54,6 +54,18 @@ export interface BlingOrder {
   };
   itens?: BlingOrderItem[];
   transporte?: {
+    servico?: string;
+    modalidade?: string;
+    contato?: {
+      nome?: string;
+    };
+    transportador?: {
+      nome?: string;
+    };
+    logistica?: {
+      id?: number;
+      nome?: string;
+    };
     volumes?: Array<{
       servico?: string;
       codigoRastreamento?: string;
@@ -67,6 +79,7 @@ export interface BlingOrder {
 }
 
 export type BlingFulfillmentType = 'full' | 'matriz' | 'nao_identificado';
+export type BlingShippingMethod = 'full' | 'flex' | 'mercado_envios' | 'correios' | 'outro' | 'nao_identificado';
 
 export interface BlingOrderOperation {
   channelId?: number;
@@ -77,6 +90,8 @@ export interface BlingOrderOperation {
   warehouseId?: number;
   warehouseName: string;
   fulfillment: BlingFulfillmentType;
+  shippingMethod: BlingShippingMethod;
+  shippingService?: string;
 }
 
 export interface BlingSalesChannelBranch {

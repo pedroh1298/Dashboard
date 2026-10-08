@@ -78,6 +78,39 @@ function orderFullSignal(order: BlingOrder): boolean {
   );
 }
 
+function shippingSignals(order: BlingOrder): string[] {
+  return [
+    order.transporte?.servico,
+    order.transporte?.modalidade,
+    order.transporte?.contato?.nome,
+    order.transporte?.transportador?.nome,
+    order.transporte?.logistica?.nome,
+    ...(order.transporte?.volumes || []).map(volume => volume.servico),
+  ].filter((value): value is string => Boolean(value?.trim()));
+}
+
+function classifyShippingMethod(
+  order: BlingOrder,
+  marketplace: string,
+  isFull: boolean
+): { method: BlingOrderOperation['shippingMethod']; service?: string } {
+  const signals = shippingSignals(order);
+  const text = normalizeLabel(signals.join(' '));
+  const service = signals[0]?.trim();
+
+  if (isFull || /(^|\W)(full|fulfillment)($|\W)/.test(text)) return { method: 'full', service };
+  if (/(^|\W)(flex|mercado envios flex|mercadoflex)($|\W)/.test(text)) return { method: 'flex', service };
+  if (/(correios|sedex|\bpac\b|mini envios|impresso normal|carta registrada)/.test(text)) {
+    return { method: 'correios', service };
+  }
+  if (/(mercado envios|mercadoenvios|meli envios|me1|me2)/.test(text)) {
+    return { method: 'mercado_envios', service };
+  }
+  if (normalizeLabel(marketplace).includes('mercado livre')) return { method: 'mercado_envios', service };
+  if (signals.length > 0) return { method: 'outro', service };
+  return { method: 'nao_identificado' };
+}
+
 export class BlingService {
   constructor(private readonly client: BlingClient) {}
 
@@ -274,6 +307,7 @@ export class BlingService {
         || containsFullSignal(channel?.descricao, branch?.unidadeNegocio, warehouse?.descricao)
         || orderFullSignal(order);
       const fulfillment: BlingOrderOperation['fulfillment'] = isFull ? 'full' : 'matriz';
+      const shipping = classifyShippingMethod(order, marketplace, isFull);
       const fallbackStoreName = marketplace === 'Amazon'
         ? 'Amazon'
         : isFull ? 'Mercado Livre - 02 - FULL' : 'Loja Mercado Livre - 01';
@@ -293,6 +327,8 @@ export class BlingService {
           warehouseId,
           warehouseName,
           fulfillment,
+          shippingMethod: shipping.method,
+          shippingService: shipping.service,
         },
       };
     });

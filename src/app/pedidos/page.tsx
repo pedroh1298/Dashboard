@@ -46,11 +46,14 @@ interface BlingOrder {
     warehouseId?: number;
     warehouseName: string;
     fulfillment: OperationFilter;
+    shippingMethod: ShippingMethod;
+    shippingService?: string;
   };
   detailsLoaded?: boolean;
 }
 
 type OperationFilter = 'full' | 'matriz' | 'nao_identificado';
+type ShippingMethod = 'full' | 'flex' | 'mercado_envios' | 'correios' | 'outro' | 'nao_identificado';
 type MarketplaceFilter = 'mercado_livre' | 'amazon';
 
 const SITUACOES: Record<number, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
@@ -117,6 +120,16 @@ function getMarketplaceStyle(marketplace?: string) {
   if (key === 'mercado_livre') return { label: 'MERCADO LIVRE', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
   if (key === 'amazon') return { label: 'AMAZON', className: 'border-[#66502a] bg-[#3a2c19] text-[#dca45e]' };
   return { label: 'MERCADO LIVRE', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
+}
+
+function getShippingStyle(method?: ShippingMethod, detailsLoaded?: boolean) {
+  if (!detailsLoaded) return { label: 'CARREGANDO', className: 'border-[#465047] bg-[#20251f] text-[#8a938b]' };
+  if (method === 'full') return { label: 'FULL', className: 'border-[#355966] bg-[#1b3038] text-[#77afc2]' };
+  if (method === 'flex') return { label: 'FLEX', className: 'border-[#66502a] bg-[#3a2c19] text-[#e2b474]' };
+  if (method === 'mercado_envios') return { label: 'MERCADO ENVIOS', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
+  if (method === 'correios') return { label: 'CORREIOS', className: 'border-[#4a6070] bg-[#1b2b35] text-[#8fc1d7]' };
+  if (method === 'outro') return { label: 'OUTRO', className: 'border-[#465047] bg-[#20251f] text-[#c1c7c1]' };
+  return { label: 'NÃO IDENTIFICADO', className: 'border-[#5b4641] bg-[#2c211f] text-[#d39a8e]' };
 }
 
 const PAGE_SIZE = 15;
@@ -439,7 +452,7 @@ export default function PedidosPage() {
               </div>
 
               {/* Tabela */}
-              <div className="data-table">
+              <div className="data-table overflow-x-auto">
                 {error && (
                   <div className="p-4 bg-red-500/10 border-b border-red-500/20 flex items-center gap-3 text-red-400 text-sm">
                     <AlertCircle className="w-4 h-4 shrink-0" />
@@ -456,11 +469,12 @@ export default function PedidosPage() {
                 ) : (
                   <>
                     {/* Header da tabela */}
-                    <div className="hidden grid-cols-[90px_minmax(180px,1.1fr)_minmax(230px,1.5fr)_150px_125px_100px_44px] gap-4 border-b border-[#dedfd8] bg-[#f4f4ef] px-6 py-3 text-[11px] font-semibold text-[#737770] lg:grid">
+                    <div className="hidden min-w-[1180px] grid-cols-[80px_minmax(160px,1fr)_minmax(210px,1.35fr)_140px_120px_135px_110px_90px_40px] gap-4 border-b border-[#dedfd8] bg-[#f4f4ef] px-6 py-3 text-[11px] font-semibold text-[#737770] lg:grid">
                       <span>Pedido</span>
                       <span>Cliente</span>
                       <span>Loja e depósito</span>
                       <span>Venda / entrega</span>
+                      <span>Tipo de envio</span>
                       <span>Status</span>
                       <span className="text-right">Total</span>
                       <span></span>
@@ -471,13 +485,14 @@ export default function PedidosPage() {
                         const sit = getSituacaoStyle(order.situacao?.id);
                         const operationStyle = getOperationStyle(order.operacao?.fulfillment);
                         const marketplaceStyle = getMarketplaceStyle(order.operacao?.marketplace);
+                        const shippingStyle = getShippingStyle(order.operacao?.shippingMethod, order.detailsLoaded);
                         const itemDescriptions = (order.itens || [])
                           .map(item => item.descricao?.trim())
                           .filter((description): description is string => Boolean(description));
                         return (
                           <div
                             key={order.id}
-                            className="data-table-row grid grid-cols-1 items-start gap-4 px-5 py-5 lg:grid-cols-[90px_minmax(180px,1.1fr)_minmax(230px,1.5fr)_150px_125px_100px_44px] lg:items-center lg:gap-4 lg:px-6 lg:py-4"
+                            className="data-table-row grid grid-cols-1 items-start gap-4 px-5 py-5 lg:min-w-[1180px] lg:grid-cols-[80px_minmax(160px,1fr)_minmax(210px,1.35fr)_140px_120px_135px_110px_90px_40px] lg:items-center lg:gap-4 lg:px-6 lg:py-4"
                           >
                             {/* Número */}
                             <div>
@@ -541,6 +556,17 @@ export default function PedidosPage() {
                                 <Truck className="h-3.5 w-3.5 shrink-0 text-[#737d75]" />
                                 <span><span className="text-[#737d75]">Entrega</span> {formatDate(order.dataPrevista || order.dataSaida || '')}</span>
                               </div>
+                            </div>
+
+                            {/* Tipo de envio */}
+                            <div>
+                              <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-[#737d75] lg:hidden">Tipo de envio</p>
+                              <span
+                                className={`inline-flex rounded-[4px] border px-2 py-1 text-[10px] font-bold ${shippingStyle.className}`}
+                                title={order.operacao?.shippingService || shippingStyle.label}
+                              >
+                                {shippingStyle.label}
+                              </span>
                             </div>
 
                             {/* Status */}
