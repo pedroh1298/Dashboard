@@ -20,11 +20,15 @@ import {
 const MAX_ORDER_PAGES = 5;
 const MAX_PRODUCT_PAGES = 100;
 const OPERATION_CACHE_TTL_MS = 5 * 60 * 1000;
+const ORDER_LIST_CACHE_TTL_MS = 45 * 1000;
+const PRODUCT_LIST_CACHE_TTL_MS = 2 * 60 * 1000;
 
 let warehouseCache: { expiresAt: number; data: BlingWarehouse[] } | null = null;
 let salesChannelsCache: { expiresAt: number; data: BlingSalesChannel[] } | null = null;
 const channelCache = new Map<number, { expiresAt: number; data: BlingSalesChannel }>();
 const orderDetailCache = new Map<number, { expiresAt: number; data: BlingOrder }>();
+const orderListCache = new Map<string, { expiresAt: number; data?: BlingOrder[]; pending?: Promise<BlingOrder[]> }>();
+let productListCache: { expiresAt: number; data?: BlingProduct[]; pending?: Promise<BlingProduct[]> } | null = null;
 
 function normalizeLabel(value?: string): string {
   return (value || '')
@@ -137,14 +141,35 @@ export class BlingService {
     dataFinal?: string;
     limite?: number;
     idSituacao?: number;
+    forceRefresh?: boolean;
   }): Promise<BlingOrder[]> {
-    const orders: BlingOrder[] = [];
-    for (let pagina = 1; pagina <= MAX_ORDER_PAGES; pagina += 1) {
-      const page = await this.getOrders({ ...params, pagina });
-      orders.push(...page);
-      if (page.length < (params?.limite || 100)) break;
+    const cacheKey = JSON.stringify({
+      dataInicial: params?.dataInicial || '',
+      dataFinal: params?.dataFinal || '',
+      limite: params?.limite || 100,
+      idSituacao: params?.idSituacao || 0,
+    });
+    const cached = orderListCache.get(cacheKey);
+    if (!params?.forceRefresh && cached?.data && cached.expiresAt > Date.now()) return cached.data;
+    if (!params?.forceRefresh && cached?.pending) return cached.pending;
+
+    const pending = (async () => {
+      const orders: BlingOrder[] = [];
+      for (let pagina = 1; pagina <= MAX_ORDER_PAGES; pagina += 1) {
+        const page = await this.getOrders({ ...params, pagina });
+        orders.push(...page);
+        if (page.length < (params?.limite || 100)) break;
+      }
+      orderListCache.set(cacheKey, { data: orders, expiresAt: Date.now() + ORDER_LIST_CACHE_TTL_MS });
+      return orders;
+    })();
+    orderListCache.set(cacheKey, { pending, expiresAt: Date.now() + ORDER_LIST_CACHE_TTL_MS });
+    try {
+      return await pending;
+    } catch (error) {
+      orderListCache.delete(cacheKey);
+      throw error;
     }
-    return orders;
   }
 
   private async getWarehouses(): Promise<BlingWarehouse[]> {
@@ -188,15 +213,15 @@ export class BlingService {
   }
 
   async getOrderDetails(ids: number[]): Promise<BlingOrder[]> {
-    const details: BlingOrder[] = [];
-    for (const id of ids) {
+    const results = await Promise.all(ids.map(async (id) => {
       try {
-        details.push(await this.getOrder(id));
+        return await this.getOrder(id);
       } catch (error) {
         console.warn(`[BlingService] Não foi possível consultar o pedido ${id}:`, error instanceof Error ? error.message : 'unknown');
+        return null;
       }
-    }
-    return details;
+    }));
+    return results.filter((order): order is BlingOrder => order !== null);
   }
 
   async enrichOrdersWithOperation(orders: BlingOrder[]): Promise<BlingOrder[]> {
@@ -219,13 +244,13 @@ export class BlingService {
     });
     basicChannels.forEach(channel => channelsById.set(channel.id, channel));
 
-    for (const channelId of channelIds) {
+    await Promise.all(channelIds.map(async (channelId) => {
       try {
         channelsById.set(channelId, await this.getSalesChannel(channelId));
       } catch (error) {
         console.warn(`[BlingService] Não foi possível consultar o canal ${channelId}:`, error instanceof Error ? error.message : 'unknown');
       }
-    }
+    }));
 
     const inferredMarketplaceByChannel = new Map<number, MarketplaceName>();
     for (const channelId of channelIds) {
@@ -347,17 +372,31 @@ export class BlingService {
 
   async getAllProducts(params?: {
     limite?: number;
+    forceRefresh?: boolean;
   }): Promise<BlingProduct[]> {
-    const limit = params?.limite || 100;
-    const products: BlingProduct[] = [];
-
-    for (let pagina = 1; pagina <= MAX_PRODUCT_PAGES; pagina += 1) {
-      const page = await this.getProducts({ pagina, limite: limit });
-      products.push(...page);
-      if (page.length < limit) break;
+    if (!params?.forceRefresh && productListCache?.data && productListCache.expiresAt > Date.now()) {
+      return productListCache.data;
     }
+    if (!params?.forceRefresh && productListCache?.pending) return productListCache.pending;
 
-    return products;
+    const limit = params?.limite || 100;
+    const pending = (async () => {
+      const products: BlingProduct[] = [];
+      for (let pagina = 1; pagina <= MAX_PRODUCT_PAGES; pagina += 1) {
+        const page = await this.getProducts({ pagina, limite: limit });
+        products.push(...page);
+        if (page.length < limit) break;
+      }
+      productListCache = { data: products, expiresAt: Date.now() + PRODUCT_LIST_CACHE_TTL_MS };
+      return products;
+    })();
+    productListCache = { pending, expiresAt: Date.now() + PRODUCT_LIST_CACHE_TTL_MS };
+    try {
+      return await pending;
+    } catch (error) {
+      productListCache = null;
+      throw error;
+    }
   }
 
   async probeConnection(): Promise<{ ok: boolean; resource: string; error?: string }> {
@@ -374,7 +413,7 @@ export class BlingService {
     }
   }
 
-  async getDashboardData(): Promise<DashboardData> {
+  async getDashboardData(forceRefresh = false): Promise<DashboardData> {
     const connected = await this.client.tokenManager.isConnected();
     if (!connected) {
       return {
@@ -393,18 +432,21 @@ export class BlingService {
       sixtyDaysAgo.setDate(now.getDate() - 60);
       const formatDate = (d: Date) => d.toISOString().split('T')[0];
 
-      const currentOrderList = await this.getAllOrders({
-        dataInicial: formatDate(thirtyDaysAgo),
-        dataFinal: formatDate(now),
-        limite: 100,
-      });
+      const [currentOrderList, previousOrders] = await Promise.all([
+        this.getAllOrders({
+          dataInicial: formatDate(thirtyDaysAgo),
+          dataFinal: formatDate(now),
+          limite: 100,
+          forceRefresh,
+        }),
+        this.getAllOrders({
+          dataInicial: formatDate(sixtyDaysAgo),
+          dataFinal: formatDate(thirtyDaysAgo),
+          limite: 100,
+          forceRefresh,
+        }).catch(() => [] as BlingOrder[]),
+      ]);
       const currentOrders = await this.enrichOrdersWithOperation(currentOrderList);
-
-      const previousOrders = await this.getAllOrders({
-        dataInicial: formatDate(sixtyDaysAgo),
-        dataFinal: formatDate(thirtyDaysAgo),
-        limite: 100,
-      }).catch(() => [] as BlingOrder[]);
 
       const faturamentoAtual = currentOrders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
       const pedidosAtual = currentOrders.length;

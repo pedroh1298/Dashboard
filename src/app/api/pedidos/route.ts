@@ -16,6 +16,7 @@ export async function GET(request: Request) {
   const dataFinal = searchParams.get('dataFinal') || undefined;
   const pageParam = searchParams.get('pagina');
   const statusParam = searchParams.get('idSituacao');
+  const forceRefresh = searchParams.get('refresh') === '1';
   const pagina = pageParam ? Number(pageParam) : undefined;
   const idSituacao = statusParam ? Number(statusParam) : undefined;
   const validDate = (value?: string) => !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
 
     const orders = pagina
       ? await service.getOrders({ dataInicial, dataFinal, pagina, idSituacao, limite: 100 })
-      : await service.getAllOrders({ dataInicial, dataFinal, idSituacao, limite: 100 });
+      : await service.getAllOrders({ dataInicial, dataFinal, idSituacao, limite: 100, forceRefresh });
     const enrichedOrders = await service.enrichOrdersWithOperation(orders);
     return NextResponse.json({ success: true, orders: enrichedOrders });
   } catch (error: unknown) {

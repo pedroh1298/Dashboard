@@ -38,7 +38,8 @@ function signature(items: DashboardNotification[]): string {
 export default function NotificationsButton() {
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [error, setError] = useState('');
   const [notifications, setNotifications] = useState<DashboardNotification[]>([]);
   const [preferences, setPreferences] = useState<NotificationPreferences>(loadNotificationPreferences);
@@ -52,6 +53,7 @@ export default function NotificationsButton() {
         const cached = JSON.parse(window.sessionStorage.getItem(CACHE_KEY) || 'null');
         if (cached?.savedAt > Date.now() - CACHE_TTL_MS && Array.isArray(cached.notifications)) {
           setNotifications(cached.notifications);
+          setHasLoaded(true);
           return;
         }
       }
@@ -61,6 +63,7 @@ export default function NotificationsButton() {
       if (!response.ok || !data.success) throw new Error(data.error || 'Falha ao carregar notificações.');
       const next = Array.isArray(data.notifications) ? data.notifications : [];
       setNotifications(next);
+      setHasLoaded(true);
       window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), notifications: next }));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Falha ao carregar notificações.');
@@ -71,8 +74,16 @@ export default function NotificationsButton() {
 
   useEffect(() => {
     setLastRead(window.localStorage.getItem(LAST_READ_KEY) || '');
-    loadNotifications();
-  }, [loadNotifications]);
+    try {
+      const cached = JSON.parse(window.sessionStorage.getItem(CACHE_KEY) || 'null');
+      if (cached?.savedAt > Date.now() - CACHE_TTL_MS && Array.isArray(cached.notifications)) {
+        setNotifications(cached.notifications);
+        setHasLoaded(true);
+      }
+    } catch {
+      window.sessionStorage.removeItem(CACHE_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     const updatePreferences = () => setPreferences(loadNotificationPreferences());
@@ -99,12 +110,17 @@ export default function NotificationsButton() {
   const currentSignature = signature(visible);
   const unread = visible.length > 0 && currentSignature !== lastRead ? visible.length : 0;
 
+  useEffect(() => {
+    if (!open || !hasLoaded) return;
+    window.localStorage.setItem(LAST_READ_KEY, currentSignature);
+    setLastRead(currentSignature);
+  }, [currentSignature, hasLoaded, open]);
+
   const toggleOpen = () => {
     const nextOpen = !open;
     setOpen(nextOpen);
     if (nextOpen) {
-      window.localStorage.setItem(LAST_READ_KEY, currentSignature);
-      setLastRead(currentSignature);
+      if (!hasLoaded) void loadNotifications();
     }
   };
 

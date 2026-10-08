@@ -20,13 +20,14 @@ export async function GET(request: Request) {
     );
   }
   const pagina = parsedPage;
+  const forceRefresh = searchParams.get('refresh') === '1';
 
   try {
     const store = await createRequestTokenStore();
     const service = new BlingService(new BlingClient(store));
     const products = pagina
       ? await service.getProducts({ pagina, limite: 100 })
-      : await service.getAllProducts({ limite: 100 });
+      : await service.getAllProducts({ limite: 100, forceRefresh });
 
     return NextResponse.json({
       success: true,

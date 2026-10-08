@@ -12,6 +12,22 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// O Bling permite 3 chamadas por segundo por conta. A fila é compartilhada entre
+// todas as instâncias quentes do servidor para evitar rajadas entre rotas paralelas.
+const BLING_REQUEST_INTERVAL_MS = 360;
+let requestQueue: Promise<void> = Promise.resolve();
+let nextRequestAt = 0;
+
+function waitForRequestSlot(): Promise<void> {
+  const scheduled = requestQueue.then(async () => {
+    const waitMs = Math.max(0, nextRequestAt - Date.now());
+    if (waitMs > 0) await sleep(waitMs);
+    nextRequestAt = Date.now() + BLING_REQUEST_INTERVAL_MS;
+  });
+  requestQueue = scheduled.catch(() => undefined);
+  return scheduled;
+}
+
 export class BlingClient {
   private readonly tokens: BlingTokenManager;
 
@@ -74,6 +90,7 @@ export class BlingClient {
   }
 
   private async doFetch(endpoint: string, accessToken: string, options: RequestOptions): Promise<Response> {
+    await waitForRequestSlot();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? API_TIMEOUT_MS);
     const url = `${BLING_API_BASE}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;

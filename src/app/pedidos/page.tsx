@@ -157,12 +157,12 @@ export default function PedidosPage() {
     return { dataInicial: fmt(from), dataFinal: fmt(now) };
   }, []);
 
-  const fetchOrders = useCallback(async (days: number) => {
+  const fetchOrders = useCallback(async (days: number, forceRefresh = false) => {
     setSyncing(true);
     setError('');
     try {
       const { dataInicial, dataFinal } = buildDateParams(days);
-      const res = await fetch(`/api/pedidos?dataInicial=${dataInicial}&dataFinal=${dataFinal}`);
+      const res = await fetch(`/api/pedidos?dataInicial=${dataInicial}&dataFinal=${dataFinal}${forceRefresh ? '&refresh=1' : ''}`);
       const data = await res.json();
       if (data.success) {
         requestedDetailIds.current.clear();
@@ -272,7 +272,6 @@ export default function PedidosPage() {
     setSelectedPeriod(days);
     setCurrentPage(1);
     setLoading(true);
-    fetchOrders(days);
   };
 
   return (
@@ -288,7 +287,7 @@ export default function PedidosPage() {
           </div>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => { setLoading(true); fetchOrders(selectedPeriod); }}
+              onClick={() => { setLoading(true); fetchOrders(selectedPeriod, true); }}
               disabled={syncing}
               className="button-secondary px-3 text-xs disabled:opacity-50"
             >

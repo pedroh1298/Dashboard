@@ -6,14 +6,15 @@ import { BlingApiError } from '@/services/bling/errors';
 import { createRequestTokenStore } from '@/services/bling/session';
 import { getBlingTokenStorageMode } from '@/services/bling/supabaseTokenStore';
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await isSessionAuthenticated())) {
     return unauthorizedJson();
   }
 
   try {
     const store = await createRequestTokenStore();
-    const dashboardData = await new BlingService(new BlingClient(store)).getDashboardData();
+    const forceRefresh = new URL(request.url).searchParams.get('refresh') === '1';
+    const dashboardData = await new BlingService(new BlingClient(store)).getDashboardData(forceRefresh);
     return NextResponse.json({
       success: true,
       tokenStorage: getBlingTokenStorageMode(),

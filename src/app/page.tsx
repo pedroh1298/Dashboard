@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { 
   BarChart3, 
   ShoppingCart, 
@@ -24,15 +25,11 @@ import {
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import NotificationsButton from '@/components/NotificationsButton';
-import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
-} from 'recharts';
+
+const SalesChart = dynamic(() => import('@/components/SalesChart'), {
+  ssr: false,
+  loading: () => <div className="h-80 w-full animate-pulse rounded-[5px] bg-[#20251f]" />,
+});
 
 interface SalesData {
   name: string;
@@ -87,10 +84,10 @@ export default function Dashboard() {
   const [modalSubmitting, setModalSubmitting] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const fetchDashboard = useCallback(async () => {
+  const fetchDashboard = useCallback(async (forceRefresh = false) => {
     try {
       setSyncing(true);
-      const res = await fetch('/api/dashboard');
+      const res = await fetch(`/api/dashboard${forceRefresh ? '?refresh=1' : ''}`);
       const data = await res.json();
 
       if (data.success) {
@@ -259,7 +256,7 @@ export default function Dashboard() {
                 <span className="h-1.5 w-1.5 rounded-full bg-[#237a61]"></span>
                 <span>Bling ERP Conectado</span>
                 <button 
-                  onClick={fetchDashboard} 
+                  onClick={() => fetchDashboard(true)}
                   disabled={syncing}
                   title="Sincronizar dados agora" 
                   className="rounded-[3px] p-1 hover:bg-[#cfe4dc]"
@@ -363,31 +360,7 @@ export default function Dashboard() {
               </div>
               
               {salesData.length > 0 && isBlingConnected ? (
-                <div className="h-80 w-full">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={salesData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <defs>
-                        <linearGradient id="colorML" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#176b57" stopOpacity={0.18}/>
-                          <stop offset="95%" stopColor="#176b57" stopOpacity={0}/>
-                        </linearGradient>
-                        <linearGradient id="colorAmz" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#bd6a24" stopOpacity={0.16}/>
-                          <stop offset="95%" stopColor="#bd6a24" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#303630" vertical={false} />
-                      <XAxis dataKey="name" stroke="#8f978f" axisLine={false} tickLine={false} tick={{fontSize: 12}} dy={10} />
-                      <YAxis stroke="#8f978f" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(v) => `R$${v/1000}k`} dx={-10} />
-                      <Tooltip 
-                        contentStyle={{ backgroundColor: '#171b18', borderColor: '#303630', borderRadius: '5px', color: '#f2f4f0' }}
-                        itemStyle={{ color: '#f2f4f0' }}
-                      />
-                      <Area type="monotone" dataKey="ML" stroke="#176b57" strokeWidth={2} fillOpacity={1} fill="url(#colorML)" />
-                      <Area type="monotone" dataKey="Amazon" stroke="#bd6a24" strokeWidth={2} fillOpacity={1} fill="url(#colorAmz)" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </div>
+                <SalesChart data={salesData} />
               ) : (
                 <div className="flex h-80 w-full flex-col items-center justify-center rounded-[5px] border border-dashed border-[#cfd1c9] p-6 text-center text-[#7b7f78]">
                   <BarChart3 className="mb-3 h-8 w-8 text-[#8a9d95]" />

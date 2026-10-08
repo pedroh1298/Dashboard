@@ -66,11 +66,11 @@ export default function ProdutosPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [connectedBling, setConnectedBling] = useState(true);
 
-  const fetchProducts = useCallback(async () => {
+  const fetchProducts = useCallback(async (forceRefresh = false) => {
     setSyncing(true);
     setError('');
     try {
-      const res = await fetch('/api/produtos');
+      const res = await fetch(`/api/produtos${forceRefresh ? '?refresh=1' : ''}`);
       const data = await res.json();
       if (data.success) {
         setProducts(data.products || []);
@@ -146,7 +146,7 @@ export default function ProdutosPage() {
           </div>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => { setLoading(true); fetchProducts(); }}
+              onClick={() => { setLoading(true); fetchProducts(true); }}
               disabled={syncing}
               className="button-secondary px-3 text-xs disabled:opacity-50"
             >
