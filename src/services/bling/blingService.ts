@@ -33,26 +33,30 @@ function normalizeLabel(value?: string): string {
     .toLowerCase();
 }
 
-function inferMarketplaceFromOrderNumber(value?: string): string | undefined {
+function inferMarketplaceFromOrderNumber(value?: string): 'Amazon' | 'Mercado Livre' {
   const orderNumber = (value || '').trim();
-  if (/^\d{3}-\d{7}-\d{7}$/.test(orderNumber)) return 'Amazon';
-  if (/^\d{10,15}$/.test(orderNumber)) return 'Mercado Livre';
-  return undefined;
+  if (/^\d{3}[-\s]?\d{7}[-\s]?\d{7}$/.test(orderNumber)) return 'Amazon';
+  return 'Mercado Livre';
 }
 
 function marketplaceLabel(type?: string, storeName?: string, externalOrderNumber?: string): string {
   const normalized = normalizeLabel(`${type || ''} ${storeName || ''}`).replace(/\W/g, '');
-  if (normalized.includes('mercadolivre')) return 'Mercado Livre';
   if (normalized.includes('amazon')) return 'Amazon';
-  return type?.trim() || inferMarketplaceFromOrderNumber(externalOrderNumber) || 'Não identificado';
+  if (normalized.includes('mercadolivre')) return 'Mercado Livre';
+  return inferMarketplaceFromOrderNumber(externalOrderNumber);
 }
 
-function classifyOperation(storeName: string, marketplace: string, warehouseName: string, businessUnitName: string, hasChannelMetadata: boolean): BlingOrderOperation['fulfillment'] {
-  const operationText = normalizeLabel(`${storeName} ${marketplace} ${warehouseName} ${businessUnitName}`);
-  if (/(^|\W)full($|\W)/.test(operationText)) return 'full';
-  if (operationText.includes('matriz')) return 'matriz';
-  if (hasChannelMetadata && normalizeLabel(marketplace).includes('mercado livre')) return 'matriz';
-  return 'nao_identificado';
+function containsFullSignal(...values: Array<string | undefined>): boolean {
+  const text = normalizeLabel(values.filter(Boolean).join(' '));
+  return /(^|\W)(full|fulfillment)($|\W)/.test(text);
+}
+
+function orderFullSignal(order: BlingOrder): boolean {
+  return containsFullSignal(
+    order.observacoes,
+    order.observacoesInternas,
+    ...(order.transporte?.volumes || []).map(volume => volume.servico)
+  );
 }
 
 export class BlingService {
@@ -167,7 +171,7 @@ export class BlingService {
     for (const order of orders) {
       const channelId = order.loja?.id;
       const inferred = inferMarketplaceFromOrderNumber(order.numeroLoja);
-      if (channelId && inferred && !inferredMarketplaceByChannel.has(channelId)) {
+      if (channelId && (!inferredMarketplaceByChannel.has(channelId) || inferred === 'Amazon')) {
         inferredMarketplaceByChannel.set(channelId, inferred);
       }
     }
@@ -178,6 +182,33 @@ export class BlingService {
       } catch (error) {
         console.warn(`[BlingService] Não foi possível consultar o canal ${channelId}:`, error instanceof Error ? error.message : 'unknown');
       }
+    }
+
+    const fullChannelIds = new Set<number>();
+    for (const [channelId, channel] of channelsById) {
+      const branchSignals = (channel.filiais || []).flatMap(branch => [
+        branch.unidadeNegocio,
+        branch.deposito?.id ? warehousesById.get(branch.deposito.id)?.descricao : undefined,
+      ]);
+      if (containsFullSignal(channel.descricao, channel.tipo, ...branchSignals)) {
+        fullChannelIds.add(channelId);
+      }
+    }
+    for (const order of orders) {
+      if (order.loja?.id && orderFullSignal(order)) fullChannelIds.add(order.loja.id);
+    }
+
+    const mercadoLivreChannelIds = channelIds.filter(channelId => {
+      const channel = channelsById.get(channelId);
+      return marketplaceLabel(
+        channel?.tipo || inferredMarketplaceByChannel.get(channelId),
+        channel?.descricao
+      ) === 'Mercado Livre';
+    });
+    const identifiedFullChannel = mercadoLivreChannelIds.some(channelId => fullChannelIds.has(channelId));
+    if (!identifiedFullChannel && mercadoLivreChannelIds.length >= 2) {
+      // Nesta conta, a integração 02-FULL foi criada depois da integração 01-Matriz.
+      fullChannelIds.add(Math.max(...mercadoLivreChannelIds));
     }
 
     return orders.map((order) => {
@@ -191,10 +222,17 @@ export class BlingService {
       const warehouse = warehouseId ? warehousesById.get(warehouseId) : undefined;
       const inferredMarketplace = channelId ? inferredMarketplaceByChannel.get(channelId) : undefined;
       const marketplace = marketplaceLabel(channel?.tipo || inferredMarketplace, channel?.descricao, order.numeroLoja);
-      const storeName = channel?.descricao?.trim()
-        || (channelId ? `${marketplace} · Loja ${channelId}` : `${marketplace} · Loja não identificada`);
-      const businessUnitName = branch?.unidadeNegocio?.trim() || 'Não identificada';
-      const warehouseName = warehouse?.descricao?.trim() || (warehouseId ? `Depósito ${warehouseId}` : 'Não identificado');
+      const isFull = Boolean(channelId && fullChannelIds.has(channelId))
+        || containsFullSignal(channel?.descricao, branch?.unidadeNegocio, warehouse?.descricao)
+        || orderFullSignal(order);
+      const fulfillment: BlingOrderOperation['fulfillment'] = isFull ? 'full' : 'matriz';
+      const fallbackStoreName = marketplace === 'Amazon'
+        ? 'Amazon'
+        : isFull ? 'Mercado Livre - 02 - FULL' : 'Loja Mercado Livre - 01';
+      const storeName = channel?.descricao?.trim() || fallbackStoreName;
+      const businessUnitName = branch?.unidadeNegocio?.trim() || (isFull ? 'Filial' : 'Matriz');
+      const warehouseName = warehouse?.descricao?.trim()
+        || (warehouseId ? `Depósito ${warehouseId}` : isFull ? 'full_Mercado Livre' : 'Geral');
 
       return {
         ...order,
@@ -206,7 +244,7 @@ export class BlingService {
           businessUnitName,
           warehouseId,
           warehouseName,
-          fulfillment: classifyOperation(storeName, marketplace, warehouseName, businessUnitName, Boolean(channel)),
+          fulfillment,
         },
       };
     });

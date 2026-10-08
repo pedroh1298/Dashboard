@@ -45,7 +45,8 @@ export async function GET(request: Request) {
     const service = new BlingService(new BlingClient(store));
     if (idsParam) {
       const orders = await service.getOrderDetails(detailIds);
-      return NextResponse.json({ success: true, orders });
+      const enrichedOrders = await service.enrichOrdersWithOperation(orders);
+      return NextResponse.json({ success: true, orders: enrichedOrders });
     }
 
     const orders = pagina

@@ -38,7 +38,6 @@ interface SalesData {
   name: string;
   ML: number;
   Amazon: number;
-  Outros?: number;
   Total?: number;
 }
 
@@ -362,7 +361,6 @@ export default function Dashboard() {
                 <div className="flex flex-wrap items-center gap-y-2">
                   <div className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#176b57]"></span><span className="text-xs text-[#6f736d]">Mercado Livre</span></div>
                   <div className="ml-3 flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#bd6a24]"></span><span className="text-xs text-[#6f736d]">Amazon</span></div>
-                  <div className="ml-3 flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#7f8790]"></span><span className="text-xs text-[#6f736d]">Outros</span></div>
                 </div>
               </div>
               
@@ -389,7 +387,6 @@ export default function Dashboard() {
                       />
                       <Area type="monotone" dataKey="ML" stroke="#176b57" strokeWidth={2} fillOpacity={1} fill="url(#colorML)" />
                       <Area type="monotone" dataKey="Amazon" stroke="#bd6a24" strokeWidth={2} fillOpacity={1} fill="url(#colorAmz)" />
-                      <Area type="monotone" dataKey="Outros" stroke="#7f8790" strokeWidth={2} fill="transparent" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>

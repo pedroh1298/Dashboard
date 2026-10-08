@@ -51,7 +51,7 @@ interface BlingOrder {
 }
 
 type OperationFilter = 'full' | 'matriz' | 'nao_identificado';
-type MarketplaceFilter = 'mercado_livre' | 'amazon' | 'outros';
+type MarketplaceFilter = 'mercado_livre' | 'amazon';
 
 const SITUACOES: Record<number, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   6:  { label: 'Em aberto',    color: 'text-[#8a5a12]', bg: 'bg-[#f5ead6] border-[#dfc99e]', icon: <Clock className="w-3.5 h-3.5" /> },
@@ -72,14 +72,12 @@ const OPERATION_OPTIONS: Array<{ value: OperationFilter | 'todos'; label: string
   { value: 'todos', label: 'Todas' },
   { value: 'matriz', label: 'Matriz' },
   { value: 'full', label: 'Full' },
-  { value: 'nao_identificado', label: 'Não identificado' },
 ];
 
 const MARKETPLACE_OPTIONS: Array<{ value: MarketplaceFilter | 'todos'; label: string }> = [
   { value: 'todos', label: 'Todas' },
   { value: 'mercado_livre', label: 'Mercado Livre' },
   { value: 'amazon', label: 'Amazon' },
-  { value: 'outros', label: 'Outros' },
 ];
 
 function getSituacaoStyle(id?: number) {
@@ -104,21 +102,21 @@ function getOperationStyle(operation?: OperationFilter) {
   if (operation === 'matriz') {
     return { label: 'MATRIZ', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
   }
-  return { label: 'NÃO IDENTIFICADO', className: 'border-[#66502a] bg-[#3a2c19] text-[#dca45e]' };
+  return { label: 'MATRIZ', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
 }
 
 function marketplaceKey(value?: string): MarketplaceFilter {
   const normalized = (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (normalized.includes('mercado livre') || normalized.includes('mercadolivre')) return 'mercado_livre';
   if (normalized.includes('amazon')) return 'amazon';
-  return 'outros';
+  return 'mercado_livre';
 }
 
 function getMarketplaceStyle(marketplace?: string) {
   const key = marketplaceKey(marketplace);
   if (key === 'mercado_livre') return { label: 'MERCADO LIVRE', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
   if (key === 'amazon') return { label: 'AMAZON', className: 'border-[#66502a] bg-[#3a2c19] text-[#dca45e]' };
-  return { label: 'OUTRO', className: 'border-[#4a5056] bg-[#252a2e] text-[#b4bbc1]' };
+  return { label: 'MERCADO LIVRE', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
 }
 
 const PAGE_SIZE = 15;
@@ -232,9 +230,17 @@ export default function PedidosPage() {
         setOrders(current => current.map(order => {
           if (!ids.includes(order.id)) return order;
           const detail = details.get(order.id);
-          return detail
-            ? { ...order, ...detail, operacao: order.operacao, detailsLoaded: true }
-            : { ...order, detailsLoaded: true };
+          if (!detail) return { ...order, detailsLoaded: true };
+          const detailOperation = detail.operacao;
+          const operation = detailOperation && order.operacao
+            ? {
+                ...detailOperation,
+                fulfillment: detailOperation.fulfillment === 'full' || order.operacao.fulfillment === 'full'
+                  ? 'full' as const
+                  : 'matriz' as const,
+              }
+            : detailOperation || order.operacao;
+          return { ...order, ...detail, operacao: operation, detailsLoaded: true };
         }));
       })
       .catch(() => {

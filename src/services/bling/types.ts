@@ -42,6 +42,8 @@ export interface BlingOrder {
   dataSaida?: string;
   dataPrevista?: string;
   total: number;
+  observacoes?: string;
+  observacoesInternas?: string;
   contato?: BlingOrderContact;
   situacao?: BlingOrderSituation;
   loja?: {
@@ -51,6 +53,12 @@ export interface BlingOrder {
     };
   };
   itens?: BlingOrderItem[];
+  transporte?: {
+    volumes?: Array<{
+      servico?: string;
+      codigoRastreamento?: string;
+    }>;
+  };
   operacao?: BlingOrderOperation;
 }
 
