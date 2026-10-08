@@ -6,7 +6,6 @@ import {
   BarChart3, 
   ShoppingCart, 
   Search, 
-  Bell, 
   TrendingUp, 
   TrendingDown, 
   DollarSign, 
@@ -24,6 +23,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import NotificationsButton from '@/components/NotificationsButton';
 import { 
   AreaChart, 
   Area, 
@@ -284,9 +284,7 @@ export default function Dashboard() {
               </button>
             )}
 
-            <button className="icon-button" aria-label="Notificações">
-              <Bell className="h-[18px] w-[18px]" />
-            </button>
+            <NotificationsButton />
             <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#26322c] text-[11px] font-semibold text-white">
               AD
             </div>

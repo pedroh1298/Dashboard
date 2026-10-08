@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Package,
-  Bell,
   Search,
   RefreshCw,
   Filter,
@@ -20,6 +19,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import NotificationsButton from '@/components/NotificationsButton';
 
 interface BlingProduct {
   id: number;
@@ -153,9 +153,7 @@ export default function ProdutosPage() {
               <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
               Atualizar
             </button>
-            <button className="icon-button" aria-label="Notificações">
-              <Bell className="h-[18px] w-[18px]" />
-            </button>
+            <NotificationsButton />
             <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#26322c] text-[11px] font-semibold text-white">
               AD
             </div>

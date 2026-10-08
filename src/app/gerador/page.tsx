@@ -4,7 +4,6 @@ import Image from 'next/image';
 import React, { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
-  Bell,
   Check,
   Clipboard,
   ImagePlus,
@@ -16,6 +15,7 @@ import {
   WandSparkles,
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import NotificationsButton from '@/components/NotificationsButton';
 import type { CompleteListingResponse, ListingMarketplace, ListingTone, ProductCondition } from '@/services/ai';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
@@ -153,9 +153,7 @@ export default function GeradorAnuncios() {
             <h1 className="text-sm font-semibold">Gerador de anúncios</h1>
           </div>
           <div className="flex items-center gap-4">
-            <button className="icon-button" aria-label="Notificações">
-              <Bell className="h-[18px] w-[18px]" />
-            </button>
+            <NotificationsButton />
             <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#26322c] text-[11px] font-semibold text-white">AD</div>
           </div>
         </header>

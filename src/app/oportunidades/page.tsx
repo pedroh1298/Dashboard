@@ -2,11 +2,11 @@
 
 import React, { useState } from 'react';
 import { 
-  Bell, 
   Activity, TrendingUp, AlertTriangle, Lightbulb,
   ExternalLink, Truck, Search, Clock, X, History
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import NotificationsButton from '@/components/NotificationsButton';
 
 interface ScrapedProduct {
   title: string;
@@ -114,9 +114,7 @@ export default function Oportunidades() {
             <h2 className="text-sm font-semibold">Pesquisa de mercado</h2>
           </div>
           <div className="flex items-center gap-4">
-            <button className="icon-button" aria-label="Notificações">
-              <Bell className="h-[18px] w-[18px]" />
-            </button>
+            <NotificationsButton />
             <div className="flex h-8 w-8 items-center justify-center rounded-[5px] bg-[#26322c] text-[11px] font-semibold text-white">
               AD
             </div>
