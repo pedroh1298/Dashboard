@@ -59,6 +59,10 @@ export interface BlingOrder {
       codigoRastreamento?: string;
     }>;
   };
+  intermediador?: {
+    cnpj?: string;
+    nomeUsuario?: string;
+  };
   operacao?: BlingOrderOperation;
 }
 

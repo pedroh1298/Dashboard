@@ -374,6 +374,7 @@ export default function PedidosPage() {
                       }`}
                     >
                       {option.label}
+                      {option.value !== 'todos' && ` (${orders.filter(order => marketplaceKey(order.operacao?.marketplace) === option.value).length})`}
                     </button>
                   ))}
                 </div>
