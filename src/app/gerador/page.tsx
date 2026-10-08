@@ -4,21 +4,37 @@ import Image from 'next/image';
 import React, { ChangeEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
+  Bookmark,
   Check,
   Clipboard,
+  ExternalLink,
+  FolderOpen,
   ImagePlus,
   Loader2,
   RefreshCw,
+  Save,
+  Search,
   Sparkles,
   Tag,
   Trash2,
+  Truck,
   WandSparkles,
 } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import NotificationsButton from '@/components/NotificationsButton';
 import type { CompleteListingResponse, ListingMarketplace, ListingTone, ProductCondition } from '@/services/ai';
+import type { SavedListing } from '@/services/listings/types';
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
+interface SimilarListing {
+  title: string;
+  price: string;
+  link: string;
+  seller: string;
+  freeShipping: boolean;
+  marketplace: 'mercado_livre' | 'amazon';
+}
 
 const marketplaceOptions: Array<{ value: ListingMarketplace; label: string }> = [
   { value: 'mercado_livre', label: 'Mercado Livre' },
@@ -36,8 +52,19 @@ function formatCurrency(value: number): string {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 }
 
+function formatDate(value: string): string {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+}
+
+function marketplaceLabel(value: ListingMarketplace | SimilarListing['marketplace']): string {
+  if (value === 'mercado_livre') return 'Mercado Livre';
+  if (value === 'amazon') return 'Amazon';
+  return 'Mercado Livre e Amazon';
+}
+
 export default function GeradorAnuncios() {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState<'new' | 'saved'>('new');
   const [productName, setProductName] = useState('');
   const [features, setFeatures] = useState('');
   const [category, setCategory] = useState('');
@@ -52,6 +79,14 @@ export default function GeradorAnuncios() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState<'title' | 'description' | 'all' | null>(null);
+  const [similarListings, setSimilarListings] = useState<SimilarListing[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarError, setSimilarError] = useState('');
+  const [savedListings, setSavedListings] = useState<SavedListing[]>([]);
+  const [savedLoading, setSavedLoading] = useState(true);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [currentSavedId, setCurrentSavedId] = useState<string | null>(null);
+  const [statusMessage, setStatusMessage] = useState('');
 
   useEffect(() => {
     if (!imageFile) {
@@ -62,6 +97,40 @@ export default function GeradorAnuncios() {
     setImagePreview(url);
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
+
+  useEffect(() => {
+    let active = true;
+    const loadSaved = async () => {
+      try {
+        const response = await fetch('/api/listings/saved', { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok || !data.success) throw new Error(data.error || 'Falha ao carregar os anúncios salvos.');
+        if (active) setSavedListings(Array.isArray(data.listings) ? data.listings : []);
+      } catch (loadError) {
+        if (active) setStatusMessage(loadError instanceof Error ? loadError.message : 'Falha ao carregar os anúncios salvos.');
+      } finally {
+        if (active) setSavedLoading(false);
+      }
+    };
+    loadSaved();
+    return () => { active = false; };
+  }, []);
+
+  const loadSimilarListings = async (query: string, selectedMarketplace: ListingMarketplace) => {
+    setSimilarLoading(true);
+    setSimilarError('');
+    setSimilarListings([]);
+    try {
+      const response = await fetch(`/api/listings/similar?q=${encodeURIComponent(query)}&marketplace=${selectedMarketplace}`, { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Não foi possível buscar anúncios similares.');
+      setSimilarListings(Array.isArray(data.products) ? data.products : []);
+    } catch (similarRequestError) {
+      setSimilarError(similarRequestError instanceof Error ? similarRequestError.message : 'Busca de similares indisponível.');
+    } finally {
+      setSimilarLoading(false);
+    }
+  };
 
   const selectImage = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -108,7 +177,11 @@ export default function GeradorAnuncios() {
       if (!response.ok || !data.success) {
         throw new Error(data.error || 'Não foi possível gerar o anúncio.');
       }
-      setListing(data.listing);
+      const generatedListing = data.listing as CompleteListingResponse;
+      setListing(generatedListing);
+      setCurrentSavedId(null);
+      setStatusMessage('');
+      void loadSimilarListings(productName.trim() || generatedListing.title, marketplace);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Falha ao conectar com o servidor.');
     } finally {
@@ -128,6 +201,68 @@ export default function GeradorAnuncios() {
     window.setTimeout(() => setCopied(null), 1800);
   };
 
+  const saveListing = async () => {
+    if (!listing) return;
+    setSaveLoading(true);
+    setStatusMessage('');
+    try {
+      const response = await fetch('/api/listings/saved', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: currentSavedId,
+          productName: productName.trim() || listing.title,
+          marketplace,
+          condition,
+          listing,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Não foi possível salvar o anúncio.');
+      const saved = data.listing as SavedListing;
+      setCurrentSavedId(saved.id);
+      setSavedListings(current => [saved, ...current.filter(item => item.id !== saved.id)]);
+      setStatusMessage(currentSavedId ? 'Alterações salvas.' : 'Anúncio salvo com sucesso.');
+    } catch (saveError) {
+      setStatusMessage(saveError instanceof Error ? saveError.message : 'Falha ao salvar o anúncio.');
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  const openSavedListing = (saved: SavedListing) => {
+    setProductName(saved.productName);
+    setMarketplace(saved.marketplace);
+    setCondition(saved.condition);
+    setListing(saved.listing);
+    setCurrentSavedId(saved.id);
+    setSimilarListings([]);
+    setSimilarError('');
+    setStatusMessage('Anúncio aberto para edição.');
+    setActiveTab('new');
+    removeImage();
+    void loadSimilarListings(saved.productName || saved.listing.title, saved.marketplace);
+  };
+
+  const copySavedListing = async (saved: SavedListing) => {
+    await navigator.clipboard.writeText(`${saved.listing.title}\n\n${saved.listing.description}\n\nPalavras-chave: ${saved.listing.keywords.join(', ')}`);
+    setStatusMessage(`"${saved.listing.title}" copiado.`);
+  };
+
+  const removeSavedListing = async (saved: SavedListing) => {
+    if (!window.confirm(`Excluir o anúncio "${saved.listing.title}"?`)) return;
+    try {
+      const response = await fetch(`/api/listings/saved?id=${encodeURIComponent(saved.id)}`, { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok || !data.success) throw new Error(data.error || 'Não foi possível excluir o anúncio.');
+      setSavedListings(current => current.filter(item => item.id !== saved.id));
+      if (currentSavedId === saved.id) setCurrentSavedId(null);
+      setStatusMessage('Anúncio excluído.');
+    } catch (deleteError) {
+      setStatusMessage(deleteError instanceof Error ? deleteError.message : 'Falha ao excluir o anúncio.');
+    }
+  };
+
   const clearAll = () => {
     setProductName('');
     setFeatures('');
@@ -138,6 +273,10 @@ export default function GeradorAnuncios() {
     setTone('direto');
     setCondition('novo');
     setListing(null);
+    setCurrentSavedId(null);
+    setSimilarListings([]);
+    setSimilarError('');
+    setStatusMessage('');
     setError('');
     removeImage();
   };
@@ -159,6 +298,37 @@ export default function GeradorAnuncios() {
         </header>
 
         <div className="app-content space-y-6">
+          <div className="flex gap-1 border-b border-[#303630]" role="tablist" aria-label="Seções do gerador">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'new'}
+              onClick={() => setActiveTab('new')}
+              className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'new' ? 'border-[#4aa185] text-[#8bcbb6]' : 'border-transparent text-[#a1a8a0] hover:text-white'}`}
+            >
+              <WandSparkles className="h-4 w-4" /> Novo anúncio
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'saved'}
+              onClick={() => setActiveTab('saved')}
+              className={`flex items-center gap-2 border-b-2 px-4 py-3 text-sm font-medium ${activeTab === 'saved' ? 'border-[#4aa185] text-[#8bcbb6]' : 'border-transparent text-[#a1a8a0] hover:text-white'}`}
+            >
+              <Bookmark className="h-4 w-4" /> Anúncios salvos
+              {savedListings.length > 0 && <span className="rounded-full bg-[#26322c] px-2 py-0.5 text-[10px] text-[#c9cec9]">{savedListings.length}</span>}
+            </button>
+          </div>
+
+          {statusMessage && (
+            <div className="flex items-center justify-between gap-4 rounded-[6px] border border-[#376b5a] bg-[#19372e] px-4 py-3 text-sm text-[#8bcbb6]">
+              <span>{statusMessage}</span>
+              <button type="button" onClick={() => setStatusMessage('')} className="text-xs font-semibold">Fechar</button>
+            </div>
+          )}
+
+          {activeTab === 'new' ? (
+            <>
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <p className="page-kicker mb-3">Inteligência artificial</p>
@@ -355,15 +525,21 @@ export default function GeradorAnuncios() {
               {!loading && listing && (
                 <>
                   <div className="surface overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-[#d7d8d0] px-5 py-4">
+                    <div className="flex flex-col gap-3 border-b border-[#d7d8d0] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-xs text-[#8a8e87]">Conteúdo gerado</p>
                         <h3 className="mt-0.5 text-sm font-semibold">Rascunho do anúncio</h3>
                       </div>
-                      <button type="button" onClick={() => copyText('all')} className="button-secondary px-3 text-xs">
-                        {copied === 'all' ? <Check className="h-4 w-4 text-[#66b89d]" /> : <Clipboard className="h-4 w-4" />}
-                        {copied === 'all' ? 'Copiado' : 'Copiar tudo'}
-                      </button>
+                      <div className="flex flex-wrap gap-2">
+                        <button type="button" onClick={() => copyText('all')} className="button-secondary px-3 text-xs">
+                          {copied === 'all' ? <Check className="h-4 w-4 text-[#66b89d]" /> : <Clipboard className="h-4 w-4" />}
+                          {copied === 'all' ? 'Copiado' : 'Copiar tudo'}
+                        </button>
+                        <button type="button" onClick={saveListing} disabled={saveLoading} className="button-primary px-3 text-xs disabled:opacity-50">
+                          {saveLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                          {saveLoading ? 'Salvando...' : currentSavedId ? 'Salvar alterações' : 'Salvar anúncio'}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-6 p-5">
@@ -455,10 +631,127 @@ export default function GeradorAnuncios() {
                       )}
                     </div>
                   </div>
+
+                  <div className="surface overflow-hidden">
+                    <div className="flex flex-col gap-3 border-b border-[#303630] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Search className="h-4 w-4 text-[#66b89d]" />
+                          <h3 className="text-sm font-semibold">Anúncios similares</h3>
+                        </div>
+                        <p className="mt-1 text-xs text-[#8a8e87]">Referências encontradas em {marketplaceLabel(marketplace)}.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => loadSimilarListings(productName.trim() || listing.title, marketplace)}
+                        disabled={similarLoading}
+                        className="button-secondary self-start px-3 text-xs disabled:opacity-50 sm:self-auto"
+                      >
+                        <RefreshCw className={`h-4 w-4 ${similarLoading ? 'animate-spin' : ''}`} /> Atualizar
+                      </button>
+                    </div>
+
+                    {similarLoading ? (
+                      <div className="flex items-center justify-center gap-2 px-5 py-10 text-sm text-[#a1a8a0]">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Buscando anúncios comparáveis...
+                      </div>
+                    ) : similarError ? (
+                      <div className="flex items-start gap-3 px-5 py-6 text-sm text-[#dca45e]">
+                        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {similarError}
+                      </div>
+                    ) : similarListings.length === 0 ? (
+                      <div className="px-5 py-8 text-center text-sm text-[#8a8e87]">Nenhuma referência pública foi encontrada nesta consulta.</div>
+                    ) : (
+                      <div className="divide-y divide-[#303630]">
+                        {similarListings.map((similar, index) => (
+                          <div key={`${similar.marketplace}-${similar.link || index}`} className="data-table-row flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                                <span className={`rounded-[4px] border px-2 py-0.5 text-[10px] font-semibold ${similar.marketplace === 'amazon' ? 'border-[#66502a] bg-[#3a2c19] text-[#e2b474]' : 'border-[#376b5a] bg-[#19372e] text-[#8bcbb6]'}`}>
+                                  {marketplaceLabel(similar.marketplace)}
+                                </span>
+                                {similar.freeShipping && <span className="flex items-center gap-1 text-[10px] text-[#a1a8a0]"><Truck className="h-3 w-3" /> Frete grátis</span>}
+                              </div>
+                              <p className="line-clamp-2 text-sm font-medium leading-5 text-[#f2f4f0]">{similar.title}</p>
+                              <p className="mt-1 text-xs text-[#737d75]">{similar.seller}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
+                              <span className="data-number text-sm font-semibold">{similar.price}</span>
+                              {similar.link && (
+                                <a href={similar.link} target="_blank" rel="noopener noreferrer" className="icon-button" title="Abrir anúncio" aria-label="Abrir anúncio">
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </section>
           </div>
+            </>
+          ) : (
+            <section className="space-y-6">
+              <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+                <div>
+                  <p className="page-kicker mb-3">Biblioteca</p>
+                  <h2 className="page-title">Anúncios salvos</h2>
+                  <p className="page-description mt-2">Rascunhos armazenados com segurança no Supabase e disponíveis em seus dispositivos.</p>
+                </div>
+                <button type="button" onClick={() => setActiveTab('new')} className="button-primary self-start px-4 text-sm sm:self-auto">
+                  <WandSparkles className="h-4 w-4" /> Criar novo
+                </button>
+              </div>
+
+              {savedLoading ? (
+                <div className="surface flex min-h-72 items-center justify-center gap-3 text-sm text-[#a1a8a0]">
+                  <Loader2 className="h-5 w-5 animate-spin" /> Carregando anúncios salvos...
+                </div>
+              ) : savedListings.length === 0 ? (
+                <div className="surface flex min-h-72 flex-col items-center justify-center px-6 text-center">
+                  <Bookmark className="mb-4 h-8 w-8 text-[#66b89d]" />
+                  <h3 className="text-base font-semibold">Nenhum anúncio salvo</h3>
+                  <p className="mt-2 max-w-sm text-sm leading-6 text-[#8a8e87]">Gere um anúncio, revise o conteúdo e use o botão Salvar anúncio.</p>
+                </div>
+              ) : (
+                <div className="data-table divide-y divide-[#303630]">
+                  {savedListings.map(saved => (
+                    <article key={saved.id} className="data-table-row px-5 py-5">
+                      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="rounded-[4px] border border-[#376b5a] bg-[#19372e] px-2 py-0.5 text-[10px] font-semibold text-[#8bcbb6]">{marketplaceLabel(saved.marketplace)}</span>
+                            <span className="rounded-[4px] border border-[#465047] bg-[#20251f] px-2 py-0.5 text-[10px] text-[#c9cec9]">{saved.condition === 'novo' ? 'Novo' : 'Usado'}</span>
+                            <span className="text-[11px] text-[#737d75]">Atualizado em {formatDate(saved.updatedAt)}</span>
+                          </div>
+                          <h3 className="text-base font-semibold leading-6 text-[#f2f4f0]">{saved.listing.title}</h3>
+                          <p className="mt-2 line-clamp-2 max-w-4xl text-sm leading-6 text-[#a1a8a0]">{saved.listing.description}</p>
+                          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[#8a8e87]">
+                            <span>{saved.listing.category}</span>
+                            <span className="data-number font-semibold text-[#8bcbb6]">{formatCurrency(saved.listing.suggestedPrice.recommended)}</span>
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap gap-2">
+                          <button type="button" onClick={() => openSavedListing(saved)} className="button-primary px-3 text-xs">
+                            <FolderOpen className="h-4 w-4" /> Abrir
+                          </button>
+                          <button type="button" onClick={() => copySavedListing(saved)} className="button-secondary px-3 text-xs">
+                            <Clipboard className="h-4 w-4" /> Copiar
+                          </button>
+                          <button type="button" onClick={() => removeSavedListing(saved)} className="icon-button border border-[#303630] text-[#e68c7e]" title="Excluir anúncio" aria-label={`Excluir ${saved.listing.title}`}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       </main>
     </div>
