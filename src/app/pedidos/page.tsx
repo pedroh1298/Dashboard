@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import {
   ShoppingCart,
@@ -47,9 +47,11 @@ interface BlingOrder {
     warehouseName: string;
     fulfillment: OperationFilter;
   };
+  detailsLoaded?: boolean;
 }
 
 type OperationFilter = 'full' | 'matriz' | 'nao_identificado';
+type MarketplaceFilter = 'mercado_livre' | 'amazon' | 'outros';
 
 const SITUACOES: Record<number, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   6:  { label: 'Em aberto',    color: 'text-[#8a5a12]', bg: 'bg-[#f5ead6] border-[#dfc99e]', icon: <Clock className="w-3.5 h-3.5" /> },
@@ -71,6 +73,13 @@ const OPERATION_OPTIONS: Array<{ value: OperationFilter | 'todos'; label: string
   { value: 'matriz', label: 'Matriz' },
   { value: 'full', label: 'Full' },
   { value: 'nao_identificado', label: 'Não identificado' },
+];
+
+const MARKETPLACE_OPTIONS: Array<{ value: MarketplaceFilter | 'todos'; label: string }> = [
+  { value: 'todos', label: 'Todas' },
+  { value: 'mercado_livre', label: 'Mercado Livre' },
+  { value: 'amazon', label: 'Amazon' },
+  { value: 'outros', label: 'Outros' },
 ];
 
 function getSituacaoStyle(id?: number) {
@@ -98,6 +107,20 @@ function getOperationStyle(operation?: OperationFilter) {
   return { label: 'NÃO IDENTIFICADO', className: 'border-[#66502a] bg-[#3a2c19] text-[#dca45e]' };
 }
 
+function marketplaceKey(value?: string): MarketplaceFilter {
+  const normalized = (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (normalized.includes('mercado livre') || normalized.includes('mercadolivre')) return 'mercado_livre';
+  if (normalized.includes('amazon')) return 'amazon';
+  return 'outros';
+}
+
+function getMarketplaceStyle(marketplace?: string) {
+  const key = marketplaceKey(marketplace);
+  if (key === 'mercado_livre') return { label: 'MERCADO LIVRE', className: 'border-[#376b5a] bg-[#19372e] text-[#8fd0ba]' };
+  if (key === 'amazon') return { label: 'AMAZON', className: 'border-[#66502a] bg-[#3a2c19] text-[#dca45e]' };
+  return { label: 'OUTRO', className: 'border-[#4a5056] bg-[#252a2e] text-[#b4bbc1]' };
+}
+
 const PAGE_SIZE = 15;
 
 export default function PedidosPage() {
@@ -110,8 +133,10 @@ export default function PedidosPage() {
   const [selectedPeriod, setSelectedPeriod] = useState(30);
   const [selectedSituacao, setSelectedSituacao] = useState<number | null>(null);
   const [selectedOperation, setSelectedOperation] = useState<OperationFilter | 'todos'>('todos');
+  const [selectedMarketplace, setSelectedMarketplace] = useState<MarketplaceFilter | 'todos'>('todos');
   const [currentPage, setCurrentPage] = useState(1);
   const [connectedBling, setConnectedBling] = useState(true);
+  const requestedDetailIds = useRef(new Set<number>());
 
   const buildDateParams = useCallback((days: number) => {
     const now = new Date();
@@ -129,7 +154,8 @@ export default function PedidosPage() {
       const res = await fetch(`/api/pedidos?dataInicial=${dataInicial}&dataFinal=${dataFinal}`);
       const data = await res.json();
       if (data.success) {
-        setOrders(data.orders || []);
+        requestedDetailIds.current.clear();
+        setOrders((data.orders || []).map((order: BlingOrder) => ({ ...order, detailsLoaded: false })));
         setConnectedBling(true);
       } else {
         setError(data.error || 'Erro ao buscar pedidos');
@@ -172,12 +198,51 @@ export default function PedidosPage() {
       result = result.filter(o => o.operacao?.fulfillment === selectedOperation);
     }
 
+    if (selectedMarketplace !== 'todos') {
+      result = result.filter(o => marketplaceKey(o.operacao?.marketplace) === selectedMarketplace);
+    }
+
     setFilteredOrders(result);
     setCurrentPage(1);
-  }, [orders, search, selectedSituacao, selectedOperation]);
+  }, [orders, search, selectedSituacao, selectedOperation, selectedMarketplace]);
 
   const totalPages = Math.max(1, Math.ceil(filteredOrders.length / PAGE_SIZE));
   const paginatedOrders = filteredOrders.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginatedOrderIds = paginatedOrders.map(order => order.id).join(',');
+
+  useEffect(() => {
+    if (!paginatedOrderIds) return;
+    const ids = paginatedOrderIds
+      .split(',')
+      .map(Number)
+      .filter(id => {
+        const order = orders.find(item => item.id === id);
+        return order && !order.detailsLoaded && !requestedDetailIds.current.has(id);
+      });
+    if (ids.length === 0) return;
+
+    ids.forEach(id => requestedDetailIds.current.add(id));
+    let cancelled = false;
+
+    fetch(`/api/pedidos?ids=${ids.join(',')}`)
+      .then(response => response.json())
+      .then(data => {
+        if (cancelled || !data.success) return;
+        const details = new Map<number, BlingOrder>((data.orders || []).map((order: BlingOrder) => [order.id, order]));
+        setOrders(current => current.map(order => {
+          if (!ids.includes(order.id)) return order;
+          const detail = details.get(order.id);
+          return detail
+            ? { ...order, ...detail, operacao: order.operacao, detailsLoaded: true }
+            : { ...order, detailsLoaded: true };
+        }));
+      })
+      .catch(() => {
+        ids.forEach(id => requestedDetailIds.current.delete(id));
+      });
+
+    return () => { cancelled = true; };
+  }, [orders, paginatedOrderIds]);
 
   const totalFaturamento = filteredOrders.reduce((s, o) => s + (Number(o.total) || 0), 0);
   const openOrders = filteredOrders.filter(order => order.situacao?.id === 6);
@@ -289,6 +354,24 @@ export default function PedidosPage() {
                   ))}
                 </div>
 
+                {/* Marketplace */}
+                <div className="surface flex flex-wrap items-center gap-1 p-1">
+                  <Store className="ml-2 h-4 w-4 text-gray-500" />
+                  {MARKETPLACE_OPTIONS.map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setSelectedMarketplace(option.value)}
+                      className={`rounded-[4px] px-3 py-1.5 text-xs font-medium ${
+                        selectedMarketplace === option.value
+                          ? 'bg-[#26322c] text-white'
+                          : 'text-[#666a63] hover:bg-[#ecece5] hover:text-[#20221f]'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
                 {/* Situação */}
                 <div className="surface flex flex-wrap items-center gap-1 p-1">
                   <Filter className="w-4 h-4 text-gray-500 ml-2" />
@@ -382,6 +465,10 @@ export default function PedidosPage() {
                       {paginatedOrders.map((order, i) => {
                         const sit = getSituacaoStyle(order.situacao?.id);
                         const operationStyle = getOperationStyle(order.operacao?.fulfillment);
+                        const marketplaceStyle = getMarketplaceStyle(order.operacao?.marketplace);
+                        const itemDescriptions = (order.itens || [])
+                          .map(item => item.descricao?.trim())
+                          .filter((description): description is string => Boolean(description));
                         return (
                           <div
                             key={order.id}
@@ -401,17 +488,25 @@ export default function PedidosPage() {
                               <p className="truncate text-sm font-medium text-[#31342f]">
                                 {order.contato?.nome || 'Cliente não informado'}
                               </p>
-                              {order.itens && order.itens.length > 0 && (
-                                <p className="text-xs text-gray-600 truncate mt-0.5">
+                              {!order.detailsLoaded ? (
+                                <p className="mt-1 text-xs text-[#737d75]">Carregando produtos...</p>
+                              ) : order.itens && order.itens.length > 0 ? (
+                                <p className="mt-1 truncate text-xs text-[#858981]" title={itemDescriptions.join(' · ')}>
                                   {order.itens.length} {order.itens.length === 1 ? 'item' : 'itens'}
-                                  {order.itens[0]?.descricao ? ` · ${order.itens[0].descricao}` : ''}
+                                  {itemDescriptions[0] ? ` · ${itemDescriptions[0]}` : ''}
+                                  {itemDescriptions.length > 1 ? ` +${itemDescriptions.length - 1}` : ''}
                                 </p>
+                              ) : (
+                                <p className="mt-1 text-xs text-[#737d75]">Produtos não informados pelo Bling</p>
                               )}
                             </div>
 
                             {/* Loja, marketplace e depósito */}
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
+                                <span className={`inline-flex rounded-[4px] border px-2 py-0.5 text-[10px] font-bold ${marketplaceStyle.className}`}>
+                                  {marketplaceStyle.label}
+                                </span>
                                 <span className={`inline-flex rounded-[4px] border px-2 py-0.5 text-[10px] font-bold ${operationStyle.className}`}>
                                   {operationStyle.label}
                                 </span>
@@ -422,7 +517,7 @@ export default function PedidosPage() {
                               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#858981]">
                                 <span className="flex min-w-0 items-center gap-1.5">
                                   <Store className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="truncate">{order.operacao?.marketplace || 'Marketplace não identificado'}</span>
+                                  <span className="truncate">{order.operacao?.businessUnitName || 'Unidade não identificada'}</span>
                                 </span>
                                 <span className="flex min-w-0 items-center gap-1.5">
                                   <Warehouse className="h-3.5 w-3.5 shrink-0" />

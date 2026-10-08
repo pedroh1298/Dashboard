@@ -11,6 +11,7 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
+  const idsParam = searchParams.get('ids');
   const dataInicial = searchParams.get('dataInicial') || undefined;
   const dataFinal = searchParams.get('dataFinal') || undefined;
   const pageParam = searchParams.get('pagina');
@@ -21,8 +22,14 @@ export async function GET(request: Request) {
   const validPositiveInteger = (value?: number) => value === undefined
     || (Number.isInteger(value) && value > 0);
 
+  const detailIds = idsParam
+    ? [...new Set(idsParam.split(',').map(value => Number(value.trim())))]
+    : [];
+
   if (
-    !validDate(dataInicial)
+    detailIds.length > 15
+    || detailIds.some(id => !Number.isInteger(id) || id <= 0)
+    || !validDate(dataInicial)
     || !validDate(dataFinal)
     || !validPositiveInteger(pagina)
     || !validPositiveInteger(idSituacao)
@@ -36,6 +43,11 @@ export async function GET(request: Request) {
   try {
     const store = await createRequestTokenStore();
     const service = new BlingService(new BlingClient(store));
+    if (idsParam) {
+      const orders = await service.getOrderDetails(detailIds);
+      return NextResponse.json({ success: true, orders });
+    }
+
     const orders = pagina
       ? await service.getOrders({ dataInicial, dataFinal, pagina, idSituacao, limite: 100 })
       : await service.getAllOrders({ dataInicial, dataFinal, idSituacao, limite: 100 });

@@ -89,6 +89,10 @@ export interface BlingSalesChannelResponse {
   data: BlingSalesChannel;
 }
 
+export interface BlingSalesChannelsResponse {
+  data: BlingSalesChannel[];
+}
+
 export interface BlingWarehouse {
   id: number;
   descricao?: string;
@@ -103,6 +107,10 @@ export interface BlingWarehousesResponse {
 
 export interface BlingOrdersResponse {
   data: BlingOrder[];
+}
+
+export interface BlingOrderResponse {
+  data: BlingOrder;
 }
 
 export interface BlingProduct {

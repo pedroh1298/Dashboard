@@ -3,11 +3,13 @@ import { BlingApiError } from './errors';
 import {
   BlingOrder,
   BlingOrderOperation,
+  BlingOrderResponse,
   BlingOrdersResponse,
   BlingProduct,
   BlingProductsResponse,
   BlingSalesChannel,
   BlingSalesChannelResponse,
+  BlingSalesChannelsResponse,
   BlingWarehouse,
   BlingWarehousesResponse,
   DashboardData,
@@ -20,7 +22,9 @@ const MAX_PRODUCT_PAGES = 100;
 const OPERATION_CACHE_TTL_MS = 5 * 60 * 1000;
 
 let warehouseCache: { expiresAt: number; data: BlingWarehouse[] } | null = null;
+let salesChannelsCache: { expiresAt: number; data: BlingSalesChannel[] } | null = null;
 const channelCache = new Map<number, { expiresAt: number; data: BlingSalesChannel }>();
+const orderDetailCache = new Map<number, { expiresAt: number; data: BlingOrder }>();
 
 function normalizeLabel(value?: string): string {
   return (value || '')
@@ -29,17 +33,25 @@ function normalizeLabel(value?: string): string {
     .toLowerCase();
 }
 
-function marketplaceLabel(type?: string, storeName?: string): string {
+function inferMarketplaceFromOrderNumber(value?: string): string | undefined {
+  const orderNumber = (value || '').trim();
+  if (/^\d{3}-\d{7}-\d{7}$/.test(orderNumber)) return 'Amazon';
+  if (/^\d{10,15}$/.test(orderNumber)) return 'Mercado Livre';
+  return undefined;
+}
+
+function marketplaceLabel(type?: string, storeName?: string, externalOrderNumber?: string): string {
   const normalized = normalizeLabel(`${type || ''} ${storeName || ''}`).replace(/\W/g, '');
   if (normalized.includes('mercadolivre')) return 'Mercado Livre';
   if (normalized.includes('amazon')) return 'Amazon';
-  return type?.trim() || 'Não identificado';
+  return type?.trim() || inferMarketplaceFromOrderNumber(externalOrderNumber) || 'Não identificado';
 }
 
-function classifyOperation(storeName: string, marketplace: string, warehouseName: string, businessUnitName: string): BlingOrderOperation['fulfillment'] {
+function classifyOperation(storeName: string, marketplace: string, warehouseName: string, businessUnitName: string, hasChannelMetadata: boolean): BlingOrderOperation['fulfillment'] {
   const operationText = normalizeLabel(`${storeName} ${marketplace} ${warehouseName} ${businessUnitName}`);
   if (/(^|\W)full($|\W)/.test(operationText)) return 'full';
-  if (operationText.includes('mercado livre') || operationText.includes('matriz')) return 'matriz';
+  if (operationText.includes('matriz')) return 'matriz';
+  if (hasChannelMetadata && normalizeLabel(marketplace).includes('mercado livre')) return 'matriz';
   return 'nao_identificado';
 }
 
@@ -89,6 +101,16 @@ export class BlingService {
     return data;
   }
 
+  private async getSalesChannels(): Promise<BlingSalesChannel[]> {
+    const now = Date.now();
+    if (salesChannelsCache && salesChannelsCache.expiresAt > now) return salesChannelsCache.data;
+
+    const result = await this.client.get<BlingSalesChannelsResponse>('/canais-venda?limite=100');
+    const data = result.data || [];
+    salesChannelsCache = { data, expiresAt: now + OPERATION_CACHE_TTL_MS };
+    return data;
+  }
+
   private async getSalesChannel(id: number): Promise<BlingSalesChannel> {
     const now = Date.now();
     const cached = channelCache.get(id);
@@ -99,6 +121,28 @@ export class BlingService {
     return result.data;
   }
 
+  async getOrder(id: number): Promise<BlingOrder> {
+    const now = Date.now();
+    const cached = orderDetailCache.get(id);
+    if (cached && cached.expiresAt > now) return cached.data;
+
+    const result = await this.client.get<BlingOrderResponse>(`/pedidos/vendas/${id}`);
+    orderDetailCache.set(id, { data: result.data, expiresAt: now + OPERATION_CACHE_TTL_MS });
+    return result.data;
+  }
+
+  async getOrderDetails(ids: number[]): Promise<BlingOrder[]> {
+    const details: BlingOrder[] = [];
+    for (const id of ids) {
+      try {
+        details.push(await this.getOrder(id));
+      } catch (error) {
+        console.warn(`[BlingService] Não foi possível consultar o pedido ${id}:`, error instanceof Error ? error.message : 'unknown');
+      }
+    }
+    return details;
+  }
+
   async enrichOrdersWithOperation(orders: BlingOrder[]): Promise<BlingOrder[]> {
     const channelIds = [...new Set(
       orders
@@ -106,14 +150,27 @@ export class BlingService {
         .filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0)
     )];
 
-    if (channelIds.length === 0) return orders;
-
     const warehouses = await this.getWarehouses().catch((error) => {
       console.warn('[BlingService] Não foi possível listar depósitos:', error instanceof Error ? error.message : 'unknown');
       return [] as BlingWarehouse[];
     });
     const warehousesById = new Map(warehouses.map(warehouse => [warehouse.id, warehouse]));
     const channelsById = new Map<number, BlingSalesChannel>();
+
+    const basicChannels = await this.getSalesChannels().catch((error) => {
+      console.warn('[BlingService] Não foi possível listar canais de venda:', error instanceof Error ? error.message : 'unknown');
+      return [] as BlingSalesChannel[];
+    });
+    basicChannels.forEach(channel => channelsById.set(channel.id, channel));
+
+    const inferredMarketplaceByChannel = new Map<number, string>();
+    for (const order of orders) {
+      const channelId = order.loja?.id;
+      const inferred = inferMarketplaceFromOrderNumber(order.numeroLoja);
+      if (channelId && inferred && !inferredMarketplaceByChannel.has(channelId)) {
+        inferredMarketplaceByChannel.set(channelId, inferred);
+      }
+    }
 
     for (const channelId of channelIds) {
       try {
@@ -132,8 +189,10 @@ export class BlingService {
         || channel?.filiais?.[0];
       const warehouseId = branch?.deposito?.id;
       const warehouse = warehouseId ? warehousesById.get(warehouseId) : undefined;
-      const storeName = channel?.descricao?.trim() || (channelId ? `Loja ${channelId}` : 'Não identificada');
-      const marketplace = marketplaceLabel(channel?.tipo, storeName);
+      const inferredMarketplace = channelId ? inferredMarketplaceByChannel.get(channelId) : undefined;
+      const marketplace = marketplaceLabel(channel?.tipo || inferredMarketplace, channel?.descricao, order.numeroLoja);
+      const storeName = channel?.descricao?.trim()
+        || (channelId ? `${marketplace} · Loja ${channelId}` : `${marketplace} · Loja não identificada`);
       const businessUnitName = branch?.unidadeNegocio?.trim() || 'Não identificada';
       const warehouseName = warehouse?.descricao?.trim() || (warehouseId ? `Depósito ${warehouseId}` : 'Não identificado');
 
@@ -147,7 +206,7 @@ export class BlingService {
           businessUnitName,
           warehouseId,
           warehouseName,
-          fulfillment: classifyOperation(storeName, marketplace, warehouseName, businessUnitName),
+          fulfillment: classifyOperation(storeName, marketplace, warehouseName, businessUnitName, Boolean(channel)),
         },
       };
     });
